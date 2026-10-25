@@ -1,0 +1,29 @@
+version: 2
+
+project_name: conf2md
+
+env:
+  - CGO_ENABLED=0
+
+builds:
+  - id: conf2md
+    main: ./cmd/conf2md
+    binary: conf2md
+    goos:
+      - windows
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - builds:
+      - conf2md
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
