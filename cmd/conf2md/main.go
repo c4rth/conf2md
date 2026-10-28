@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -14,11 +17,17 @@ import (
 
 	"conf2md/internal/config"
 	"conf2md/internal/converter"
+	"conf2md/internal/goconfluence"
 )
+
+var version = "dev"
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	if err := newRootCommand().Execute(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	err := newRootCommand().ExecuteContext(ctx)
+	stop()
+	if err != nil {
 		log.Error().Err(err).Msg("conf2md encountered an error")
 		os.Exit(1)
 	}
@@ -26,27 +35,42 @@ func main() {
 
 func initConfig(settings *viper.Viper) error {
 	if err := gotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		log.Error().Err(err).Msg("load .env")
-		log.Warn().Msg("continuing without .env file")
+		log.Warn().Err(err).Msg("continuing without .env file")
 	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 	settings.AddConfigPath(cwd)
-	settings.SetEnvPrefix("CONFLUENCE")
+	settings.SetConfigName("config")
+	settings.SetEnvPrefix("CONF2MD")
 	settings.SetEnvKeyReplacer(strings.NewReplacer(".", "__"))
 	settings.AutomaticEnv()
 
 	if err := settings.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); !ok {
 			return fmt.Errorf("read configuration: %w", err)
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "Using config file:", settings.ConfigFileUsed())
+		log.Info().Msgf("using config file: %s", settings.ConfigFileUsed())
 	}
 	return nil
+}
+
+func resolveArgs(settings *viper.Viper) config.CmdLineArgs {
+	return config.CmdLineArgs{
+		Space:          settings.GetString("space"),
+		Page:           settings.GetString("page"),
+		OutputDir:      settings.GetString("output"),
+		ConfluenceUrl:  settings.GetString("url"),
+		ConfluenceApi:  settings.GetString("api"),
+		Token:          settings.GetString("token"),
+		ExportChildren: settings.GetBool("children"),
+		Local:          settings.GetBool("local"),
+		Mkdocs:         settings.GetBool("mkdocs"),
+		Debug:          settings.GetBool("debug"),
+		Timeout:        settings.GetDuration("timeout"),
+	}
 }
 
 func newRootCommand() *cobra.Command {
@@ -59,35 +83,37 @@ func newRootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PreRunE: func(cmd *cobra.Command, _ []string) error {
+			if err := initConfig(settings); err != nil {
+				return err
+			}
+			args = resolveArgs(settings)
 			if args.Debug {
 				log.Logger = log.Logger.Level(zerolog.DebugLevel)
 			} else {
 				log.Logger = log.Logger.Level(zerolog.InfoLevel)
 			}
-			if err := initConfig(settings); err != nil {
-				return err
-			}
-			args.ConfluenceUrl = settings.GetString("url")
-			args.Token = settings.GetString("token")
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if err := args.Validate(); err != nil {
+				_ = cmd.Help()
 				return err
 			}
-			return converter.ConvertConfluenceToMarkdown(&args)
+			return converter.ConvertConfluenceToMarkdown(cmd.Context(), &args)
 		},
 	}
-	command.Version = "0.1.0"
-	command.Flags().StringVarP(&args.Page, "page", "p", "", "Confluence 'pageId', 'space/title' or file name with path")
-	command.Flags().StringVarP(&args.OutputDir, "output", "o", "output", "Directory to save Markdown files")
-	command.Flags().StringVarP(&args.ConfluenceUrl, "url", "u", "", "Confluence base URL")
-	cobra.CheckErr(settings.BindPFlag("url", command.Flags().Lookup("url")))
-	command.Flags().StringVarP(&args.Token, "token", "t", "", "Confluence API token")
-	cobra.CheckErr(settings.BindPFlag("token", command.Flags().Lookup("token")))
-	command.Flags().BoolVarP(&args.ExportChildren, "children", "c", true, "export child pages")
-	command.Flags().BoolVarP(&args.Local, "local", "l", false, "use local mode")
-	command.Flags().BoolVarP(&args.Mkdocs, "mkdocs", "m", true, "generate MkDocs compatible output")
-	command.Flags().BoolVarP(&args.Debug, "debug", "d", false, "enable debug logging")
+	command.Version = version
+	command.Flags().StringVarP(&args.Space, "space", "s", "", "Confluence space key (env: CONF2MD_SPACE)")
+	command.Flags().StringVarP(&args.Page, "page", "p", "", "Confluence 'pageId', 'space/title' or file name with path (env: CONF2MD_PAGE)")
+	command.Flags().StringVarP(&args.OutputDir, "output", "o", "output", "Directory to save Markdown files (default: output, env: CONF2MD_OUTPUT)")
+	command.Flags().StringVarP(&args.ConfluenceUrl, "url", "u", "", "Confluence base URL (env: CONF2MD_URL)")
+	command.Flags().StringVarP(&args.ConfluenceApi, "api", "a", "/wiki/rest/api", "Confluence API endpoint (default: /wiki/rest/api, env: CONF2MD_API)")
+	command.Flags().StringVarP(&args.Token, "token", "t", "", "Confluence API token (env: CONF2MD_TOKEN)")
+	command.Flags().BoolVarP(&args.ExportChildren, "children", "c", true, "export child pages (default: true, env: CONF2MD_CHILDREN)")
+	command.Flags().BoolVarP(&args.Local, "local", "l", false, "use local mode (env: CONF2MD_LOCAL)")
+	command.Flags().BoolVarP(&args.Mkdocs, "mkdocs", "m", true, "generate mkdocs.yml (default: true, env: CONF2MD_MKDOCS)")
+	command.Flags().BoolVarP(&args.Debug, "debug", "d", false, "enable debug logging (env: CONF2MD_DEBUG)")
+	command.Flags().DurationVar(&args.Timeout, "timeout", goconfluence.DefaultTimeout, "maximum duration of each Confluence HTTP request, 0 disables it (default: "+goconfluence.DefaultTimeout.String()+", env: CONF2MD_TIMEOUT)")
+	cobra.CheckErr(settings.BindPFlags(command.Flags()))
 	return command
 }

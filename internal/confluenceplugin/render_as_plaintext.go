@@ -1,13 +1,11 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
-	"golang.org/x/net/html"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
-	"github.com/rs/zerolog/log"
+	"golang.org/x/net/html"
 )
 
 func (cp *confluencePlugin) renderAsPlainText(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {
-	log.Debug().Msg("********************************")
 	ctx.RenderChildNodes(ctx, w, node)
 	return converter.RenderSuccess
 }

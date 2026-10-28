@@ -1,6 +1,7 @@
 package goconfluence
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 	"strings"
@@ -29,17 +30,17 @@ type AllSpacesQuery struct {
 
 // getSpaceEndpoint creates the correct api endpoint
 func (a *API) getSpaceEndpoint() (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/space")
+	return a.getEndpoint("/space")
 }
 
 // GetAllSpaces queries content using a query parameters
-func (a *API) GetAllSpaces(query AllSpacesQuery) (*AllSpaces, error) {
+func (a *API) GetAllSpaces(ctx context.Context, query AllSpacesQuery) (*AllSpaces, error) {
 	ep, err := a.getSpaceEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	ep.RawQuery = addAllSpacesQueryParams(query).Encode()
-	return a.SendAllSpacesRequest(ep, "GET")
+	return a.SendAllSpacesRequest(ctx, ep, "GET")
 }
 
 // addAllSpacesQueryParams adds the defined query parameters

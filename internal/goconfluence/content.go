@@ -1,8 +1,8 @@
 package goconfluence
 
 import (
+	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -35,6 +35,11 @@ type Content struct {
 	History   *History   `json:"history,omitempty"`
 	Links     *Links     `json:"_links,omitempty"`
 	Metadata  *Metadata  `json:"metadata,omitempty"`
+	Children  *Children  `json:"children,omitempty"`
+}
+
+type Children struct {
+	Page *Search `json:"page,omitempty"`
 }
 
 // Metadata specifies metadata properties
@@ -75,6 +80,7 @@ type Links struct {
 	TinyUI   string `json:"tinyui"`
 	WebUI    string `json:"webui"`
 	Download string `json:"download"`
+	Self     string `json:"self"`
 }
 
 // Ancestor defines ancestors to create sub pages
@@ -121,22 +127,22 @@ type Space struct {
 
 // getContentIDEndpoint creates the correct api endpoint by given id
 func (a *API) getContentIDEndpoint(id string) (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/content/" + id)
+	return a.getEndpoint("/content/" + id)
 }
 
 // getContentEndpoint creates the correct api endpoint
 func (a *API) getContentEndpoint() (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/content/")
+	return a.getEndpoint("/content/")
 }
 
 // getContentChildEndpoint creates the correct api endpoint by given id and type
 func (a *API) getContentChildEndpoint(id string, t string) (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/content/" + id + "/child/" + t)
+	return a.getEndpoint("/content/" + id + "/child/" + t)
 }
 
 // getContentGenericEndpoint creates the correct api endpoint by given id and type
 func (a *API) getContentGenericEndpoint(id string, t string) (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/content/" + id + "/" + t)
+	return a.getEndpoint("/content/" + id + "/" + t)
 }
 
 // ContentQuery defines the query parameters
@@ -158,13 +164,13 @@ type ContentQuery struct {
 }
 
 // GetContentByID querys content by id
-func (a *API) GetContentByID(id string, query ContentQuery) (*Content, error) {
+func (a *API) GetContentByID(ctx context.Context, id string, query ContentQuery) (*Content, error) {
 	ep, err := a.getContentIDEndpoint(id)
 	if err != nil {
 		return nil, err
 	}
 	ep.RawQuery = addContentQueryParams(query).Encode()
-	return a.SendContentRequest(ep, "GET", nil)
+	return a.SendContentRequest(ctx, ep, "GET", nil)
 }
 
 // ContentSearch results
@@ -176,14 +182,14 @@ type ContentSearch struct {
 }
 
 // GetContent querys content using a query parameters
-func (a *API) GetContent(query ContentQuery) (*ContentSearch, error) {
+func (a *API) GetContent(ctx context.Context, query ContentQuery) (*ContentSearch, error) {
 	ep, err := a.getContentEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	ep.RawQuery = addContentQueryParams(query).Encode()
 
-	req, err := http.NewRequest("GET", ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,13 +209,17 @@ func (a *API) GetContent(query ContentQuery) (*ContentSearch, error) {
 }
 
 // GetChildPages returns a content list of child page objects
-func (a *API) GetChildPages(id string) (*Search, error) {
+func (a *API) GetChildPages(ctx context.Context, id string) (*Search, error) {
+	return a.getChildContent(ctx, id, "page")
+}
+
+func (a *API) getChildContent(ctx context.Context, id, contentType string) (*Search, error) {
 	var (
 		results      []Results
 		searchResult Search
 	)
 
-	ep, err := a.getContentChildEndpoint(id, "page")
+	ep, err := a.getContentChildEndpoint(id, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -223,15 +233,19 @@ func (a *API) GetChildPages(id string) (*Search, error) {
 
 	for {
 		ep.RawQuery = addContentQueryParams(query).Encode()
-		s, err := a.SendSearchRequest(ep, "GET")
+		s, err := a.SendSearchRequest(ctx, ep, "GET")
 		if err != nil {
 			return nil, err
 		}
 		results = append(results, s.Results...)
-		if len(s.Results) < query.Limit {
+		pageLimit := query.Limit
+		if s.Limit > 0 && s.Limit < pageLimit {
+			pageLimit = s.Limit
+		}
+		if len(s.Results) < pageLimit {
 			break
 		}
-		query.Start += 25
+		query.Start += len(s.Results)
 	}
 
 	searchResult.Limit = len(results)
@@ -242,21 +256,17 @@ func (a *API) GetChildPages(id string) (*Search, error) {
 }
 
 // GetComments returns a list of comments belonging to id
-func (a *API) GetComments(id string) (*Search, error) {
+func (a *API) GetComments(ctx context.Context, id string) (*Search, error) {
 	ep, err := a.getContentChildEndpoint(id, "comment")
 	if err != nil {
 		return nil, err
 	}
-	return a.SendSearchRequest(ep, "GET")
+	return a.SendSearchRequest(ctx, ep, "GET")
 }
 
-// GetAttachments returns a list of attachments belonging to id
-func (a *API) GetAttachments(id string) (*Search, error) {
-	ep, err := a.getContentChildEndpoint(id, "attachment")
-	if err != nil {
-		return nil, err
-	}
-	return a.SendSearchRequest(ep, "GET")
+// GetAttachments returns all attachments belonging to id.
+func (a *API) GetAttachments(ctx context.Context, id string) (*Search, error) {
+	return a.getChildContent(ctx, id, "attachment")
 }
 
 // History contains object history information
@@ -280,12 +290,12 @@ type LastUpdated struct {
 }
 
 // GetHistory returns history information
-func (a *API) GetHistory(id string) (*History, error) {
+func (a *API) GetHistory(ctx context.Context, id string) (*History, error) {
 	ep, err := a.getContentGenericEndpoint(id, "history")
 	if err != nil {
 		return nil, err
 	}
-	return a.SendHistoryRequest(ep, "GET")
+	return a.SendHistoryRequest(ctx, ep, "GET")
 }
 
 // Labels is the label containter type
@@ -305,101 +315,30 @@ type Label struct {
 }
 
 // GetLabels returns a list of labels attachted to a content object
-func (a *API) GetLabels(id string) (*Labels, error) {
+func (a *API) GetLabels(ctx context.Context, id string) (*Labels, error) {
 	ep, err := a.getContentGenericEndpoint(id, "label")
 	if err != nil {
 		return nil, err
 	}
-	return a.SendLabelRequest(ep, "GET", nil)
+	return a.SendLabelRequest(ctx, ep, "GET", nil)
 }
 
 // AddLabels returns adds labels
-func (a *API) AddLabels(id string, labels *[]Label) (*Labels, error) {
+func (a *API) AddLabels(ctx context.Context, id string, labels *[]Label) (*Labels, error) {
 	ep, err := a.getContentGenericEndpoint(id, "label")
 	if err != nil {
 		return nil, err
 	}
-	return a.SendLabelRequest(ep, "POST", labels)
+	return a.SendLabelRequest(ctx, ep, "POST", labels)
 }
 
 // DeleteLabel removes a label by name from content identified by id
-func (a *API) DeleteLabel(id string, name string) (*Labels, error) {
+func (a *API) DeleteLabel(ctx context.Context, id string, name string) (*Labels, error) {
 	ep, err := a.getContentGenericEndpoint(id, "label/"+name)
 	if err != nil {
 		return nil, err
 	}
-	return a.SendLabelRequest(ep, "DELETE", nil)
-}
-
-// Watchers is a list of Watcher
-type Watchers struct {
-	Watchers []Watcher `json:"results"`
-	Start    int       `json:"start,omitempty"`
-	Limit    int       `json:"limit,omitempty"`
-	Size     int       `json:"size,omitempty"`
-}
-
-// Watcher contains information about watching users of a page
-type Watcher struct {
-	Type      string `json:"type"`
-	Watcher   User   `json:"watcher"`
-	ContentID int    `json:"contentId"`
-}
-
-// GetWatchers returns a list of watchers
-func (a *API) GetWatchers(id string) (*Watchers, error) {
-	ep, err := a.getContentGenericEndpoint(id, "notification/child-created")
-	if err != nil {
-		return nil, err
-	}
-	return a.SendWatcherRequest(ep, "GET")
-}
-
-// CreateContent creates content
-func (a *API) CreateContent(c *Content) (*Content, error) {
-	ep, err := a.getContentEndpoint()
-	if err != nil {
-		return nil, err
-	}
-	return a.SendContentRequest(ep, "POST", c)
-}
-
-// UpdateContent updates content
-func (a *API) UpdateContent(c *Content) (*Content, error) {
-	ep, err := a.getContentIDEndpoint(c.ID)
-	if err != nil {
-		return nil, err
-	}
-	return a.SendContentRequest(ep, "PUT", c)
-}
-
-// UploadAttachment uploaded the given reader as an attachment to the
-// page with the given id. The existing attachment won't be updated with
-// a new version number
-func (a *API) UploadAttachment(id string, attachmentName string, attachment io.Reader) (*Search, error) {
-	ep, err := a.getContentChildEndpoint(id, "attachment")
-	if err != nil {
-		return nil, err
-	}
-	return a.SendContentAttachmentRequest(ep, attachmentName, attachment, map[string]string{})
-}
-
-// UpdateAttachment update the attachment with an attachmentID on a page with an id to a new version
-func (a *API) UpdateAttachment(id string, attachmentName string, attachmentID string, attachment io.Reader) (*Search, error) {
-	ep, err := a.getContentChildEndpoint(id, "attachment/"+attachmentID+"/data")
-	if err != nil {
-		return nil, err
-	}
-	return a.SendContentAttachmentRequest(ep, attachmentName, attachment, map[string]string{})
-}
-
-// DelContent deletes content by id
-func (a *API) DelContent(id string) (*Content, error) {
-	ep, err := a.getContentIDEndpoint(id)
-	if err != nil {
-		return nil, err
-	}
-	return a.SendContentRequest(ep, "DELETE", nil)
+	return a.SendLabelRequest(ctx, ep, "DELETE", nil)
 }
 
 // ContentVersionResult contains the version results
@@ -408,12 +347,12 @@ type ContentVersionResult struct {
 }
 
 // GetContentVersion gets all versions of this content
-func (a *API) GetContentVersion(id string) (*ContentVersionResult, error) {
+func (a *API) GetContentVersion(ctx context.Context, id string) (*ContentVersionResult, error) {
 	ep, err := a.getContentGenericEndpoint(id, "version")
 	if err != nil {
 		return nil, err
 	}
-	return a.SendContentVersionRequest(ep, "GET")
+	return a.SendContentVersionRequest(ctx, ep, "GET")
 }
 
 // addContentQueryParams adds the defined query parameters

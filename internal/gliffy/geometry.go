@@ -144,7 +144,7 @@ func constraintData(obj *Object, start bool) *ConstraintData {
 }
 
 func styleValue(style, key string) string {
-	for _, part := range strings.Split(style, ";") {
+	for part := range strings.SplitSeq(style, ";") {
 		if k, value, ok := strings.Cut(part, "="); ok && strings.EqualFold(k, key) {
 			return value
 		}

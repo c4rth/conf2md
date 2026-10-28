@@ -1,8 +1,8 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
-	"golang.org/x/net/html"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
+	"golang.org/x/net/html"
 )
 
 func (cp *confluencePlugin) renderAsRichText(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {

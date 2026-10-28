@@ -79,16 +79,29 @@ type Object struct {
 	importChildren []*Object
 }
 
+type GraphicType string
+
+const (
+	GraphicTypeShape     GraphicType = "Shape"
+	GraphicTypeLine      GraphicType = "Line"
+	GraphicTypeText      GraphicType = "Text"
+	GraphicTypeImage     GraphicType = "Image"
+	GraphicTypeSVG       GraphicType = "Svg"
+	GraphicTypeLink      GraphicType = "Link"
+	GraphicTypePopupNote GraphicType = "PopupNote"
+	GraphicTypeMindmap   GraphicType = "Mindmap"
+)
+
 type Graphic struct {
-	Type      string     `json:"type"`
-	Text      *Text      `json:"Text"`
-	Line      *Line      `json:"Line"`
-	Link      *Link      `json:"Link"`
-	Shape     *Shape     `json:"Shape"`
-	Image     *Image     `json:"Image"`
-	SVG       *SVG       `json:"Svg"`
-	Mindmap   *Shape     `json:"Mindmap"`
-	PopupNote *PopupNote `json:"PopupNote"`
+	Type      GraphicType `json:"type"`
+	Text      *Text       `json:"Text"`
+	Line      *Line       `json:"Line"`
+	Link      *Link       `json:"Link"`
+	Shape     *Shape      `json:"Shape"`
+	Image     *Image      `json:"Image"`
+	SVG       *SVG        `json:"Svg"`
+	Mindmap   *Shape      `json:"Mindmap"`
+	PopupNote *PopupNote  `json:"PopupNote"`
 }
 
 type Shape struct {

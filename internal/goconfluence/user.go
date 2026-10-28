@@ -1,6 +1,7 @@
 package goconfluence
 
 import (
+	"context"
 	"net/url"
 	"strings"
 )
@@ -16,40 +17,40 @@ type User struct {
 
 // getUserEndpoint creates the correct api endpoint by given id
 func (a *API) getUserEndpoint(id string) (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/user?accountId=" + id)
+	return a.getEndpoint("/user?accountId=" + id)
 }
 
 // getCurrentUserEndpoint creates the correct api endpoint by given id
 func (a *API) getCurrentUserEndpoint() (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/user/current")
+	return a.getEndpoint("/user/current")
 }
 
 // getAnonymousUserEndpoint creates the correct api endpoint by given id
 func (a *API) getAnonymousUserEndpoint() (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/user/anonymous")
+	return a.getEndpoint("/user/anonymous")
 }
 
 // CurrentUser return current user information
-func (a *API) CurrentUser() (*User, error) {
+func (a *API) CurrentUser(ctx context.Context) (*User, error) {
 	ep, err := a.getCurrentUserEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	return a.SendUserRequest(ep, "GET")
+	return a.SendUserRequest(ctx, ep, "GET")
 }
 
 // AnonymousUser return user information for anonymous user
-func (a *API) AnonymousUser() (*User, error) {
+func (a *API) AnonymousUser(ctx context.Context) (*User, error) {
 	ep, err := a.getAnonymousUserEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	return a.SendUserRequest(ep, "GET")
+	return a.SendUserRequest(ctx, ep, "GET")
 }
 
 // User returns user data for defined query
 // query can be accountID or username
-func (a *API) User(query string) (*User, error) {
+func (a *API) User(ctx context.Context, query string) (*User, error) {
 	ep, err := a.getUserEndpoint("")
 	if err != nil {
 		return nil, err
@@ -67,5 +68,5 @@ func (a *API) User(query string) (*User, error) {
 	}
 
 	ep.RawQuery = data.Encode()
-	return a.SendUserRequest(ep, "GET")
+	return a.SendUserRequest(ctx, ep, "GET")
 }

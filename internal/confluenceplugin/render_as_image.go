@@ -1,6 +1,8 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
+	"conf2md/internal/storage"
+
 	"github.com/JohannesKaufmann/dom"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"golang.org/x/net/html"
@@ -13,7 +15,7 @@ func (cp *confluencePlugin) renderAsImage(ctx converter.Context, w converter.Wri
 	})
 	src := ""
 	if attachment != nil {
-		src = dom.GetAttributeOr(attachment, "ri:filename", "")
+		src = storage.SanitizeFilename(dom.GetAttributeOr(attachment, "ri:filename", ""))
 	}
 	title := dom.GetAttributeOr(node, "ac:title", "")
 	width := dom.GetAttributeOr(node, "ac:width", "")
@@ -32,6 +34,6 @@ func (cp *confluencePlugin) renderAsImage(ctx converter.Context, w converter.Wri
 	if title != "" {
 		title = " \"" + title + "\""
 	}
-	w.WriteString("![" + altName + "]" + "(attachments/" + src + title + ")" + stylePart)
+	WriteString(w, "!["+altName+"]"+"(attachments/"+src+title+")"+stylePart)
 	return converter.RenderSuccess
 }

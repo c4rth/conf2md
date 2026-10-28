@@ -11,7 +11,7 @@ import (
 
 func shapeSet(prefix, names string) map[string]bool {
 	result := make(map[string]bool)
-	for _, name := range strings.Fields(names) {
+	for name := range strings.FieldsSeq(names) {
 		result[prefix+name] = true
 	}
 	return result
@@ -61,11 +61,11 @@ func (o *Object) isGroup() bool {
 }
 
 func (o *Object) isText() bool {
-	return o != nil && o.Graphic != nil && o.Graphic.Type == "Text"
+	return o != nil && o.Graphic != nil && o.Graphic.Type == GraphicTypeText
 }
 
 func (o *Object) isLine() bool {
-	return o != nil && o.Graphic != nil && o.Graphic.Type == "Line"
+	return o != nil && o.Graphic != nil && o.Graphic.Type == GraphicTypeLine
 }
 
 func (o *Object) isSwimlane() bool {
@@ -132,7 +132,7 @@ func shapeStyle(obj *Object, shape *Shape, translated string) string {
 	}
 	chevron := strings.Contains(obj.UID, "chevron")
 	noFill := strings.Contains(shape.TID, "no_fill")
-	appendDefault("shadow", boolInt(shape.DropShadow))
+	appendDefault("shadow", boolString(shape.DropShadow))
 	if !strings.Contains(translated, "strokeWidth") {
 		writeStrings(&style, "strokeWidth=", format(math.Floor(shape.StrokeWidth+0.5)), ";")
 		if math.Floor(shape.StrokeWidth+0.5) == 0 && !chevron {
@@ -258,7 +258,7 @@ func (c *converter) swimlaneStyle(obj *Object) string {
 }
 
 func laneShapeStyle(shape *Shape) string {
-	return "strokeWidth=" + format(math.Floor(shape.StrokeWidth+0.5)) + ";shadow=" + boolInt(shape.DropShadow) +
+	return "strokeWidth=" + format(math.Floor(shape.StrokeWidth+0.5)) + ";shadow=" + boolString(shape.DropShadow) +
 		";fillColor=" + shape.FillColor + ";strokeColor=" + shape.StrokeColor + ";"
 }
 

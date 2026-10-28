@@ -1,4 +1,4 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
 	"github.com/JohannesKaufmann/dom"
@@ -18,15 +18,15 @@ func (cp *confluencePlugin) renderAsTaskList(ctx converter.Context, w converter.
 		taskBody := dom.FindFirstNode(task, func(n *html.Node) bool {
 			return dom.NodeName(n) == "ac:task-body"
 		})
-		w.WriteString(" - [")
+		WriteString(w, " - [")
 		if status {
-			w.WriteString("x")
+			WriteString(w, "x")
 		} else {
-			w.WriteString(" ")
+			WriteString(w, " ")
 		}
-		w.WriteString("]   ")
+		WriteString(w, "]   ")
 		ctx.RenderChildNodes(ctx, w, taskBody)
-		w.WriteString("\n")
+		WriteString(w, "\n")
 	}
 	return converter.RenderSuccess
 }

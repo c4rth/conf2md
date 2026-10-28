@@ -2,15 +2,17 @@ package goconfluence
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"mime/multipart"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Request implements the basic Request function
@@ -22,59 +24,101 @@ func (a *API) Request(req *http.Request) ([]byte, error) {
 		a.Auth(req)
 	}
 
-	Debug("====== Request ======")
-	Debug(req)
-	Debug("====== Request Body ======")
-	if DebugFlag {
-		requestDump, err := httputil.DumpRequest(req, true)
+	if event := log.Debug(); event.Enabled() {
+		dumpReq := req.Clone(req.Context())
+		dumpReq.Header.Del("Authorization")
+		dumpReq.Header.Del("Proxy-Authorization")
+		dumpReq.Header.Del("Cookie")
+		requestDump, err := httputil.DumpRequest(dumpReq, isTextContentType(req.Header.Get("Content-Type")))
+		// DumpRequest can replace the body after reading it.
+		req.Body = dumpReq.Body
 		if err != nil {
-			fmt.Println(err)
+			event.Err(err).Msg("Failed to dump request")
+		} else {
+			event.Msg(string(requestDump))
 		}
-		fmt.Println(string(requestDump))
 	}
-	Debug("====== /Request Body ======")
-	Debug("====== /Request ======")
 
 	resp, err := a.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	Debug(fmt.Sprintf("====== Response Status Code: %d ======", resp.StatusCode))
+	defer resp.Body.Close()
 
-	res, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return nil, err
-	}
+	log.Debug().Msgf("====== Response Status Code: %d ======", resp.StatusCode)
 
-	Debug("====== Response Body ======")
-	Debug(string(res))
-	Debug("====== /Response Body ======")
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusResetContent {
+			return nil, nil
+		}
+		res, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read response body: %w", err)
+		}
 
-	switch resp.StatusCode {
-	case http.StatusOK, http.StatusCreated, http.StatusPartialContent:
+		if event := log.Debug(); event.Enabled() {
+			contentType := resp.Header.Get("Content-Type")
+			if contentType == "" {
+				contentType = http.DetectContentType(res)
+			}
+			if isTextContentType(contentType) {
+				event.Msg(string(res))
+			} else {
+				event.Int("bytes", len(res)).Msg("Binary response body omitted")
+			}
+		}
 		return res, nil
-	case http.StatusNoContent, http.StatusResetContent:
-		return nil, nil
-	case http.StatusUnauthorized:
-		return nil, fmt.Errorf("authentication failed")
-	case http.StatusServiceUnavailable:
-		return nil, fmt.Errorf("service is not available: %s", resp.Status)
-	case http.StatusInternalServerError:
-		return nil, fmt.Errorf("internal server error: %s", resp.Status)
-	case http.StatusConflict:
-		return nil, fmt.Errorf("conflict: %s", resp.Status)
 	}
 
-	return nil, fmt.Errorf("unknown response status: %s", resp.Status)
+	message := "request failed"
+	switch resp.StatusCode {
+	case http.StatusUnauthorized:
+		message = "authentication failed"
+	case http.StatusServiceUnavailable:
+		message = "service is not available"
+	case http.StatusInternalServerError:
+		message = "internal server error"
+	case http.StatusConflict:
+		message = "conflict"
+	}
+
+	const responseBodySnippetLimit = 1024
+	body, err := io.ReadAll(io.LimitReader(resp.Body, responseBodySnippetLimit+1))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s: read response body: %w", message, resp.Status, err)
+	}
+
+	truncated := len(body) > responseBodySnippetLimit
+	if truncated {
+		body = body[:responseBodySnippetLimit]
+	}
+	errMsg := fmt.Sprintf("%s: %s", message, resp.Status)
+	if len(body) > 0 {
+		snippet := strings.TrimSpace(string(body))
+		if truncated && snippet != "" {
+			snippet += "..."
+		}
+		if snippet != "" {
+			errMsg += fmt.Sprintf(": %q", snippet)
+		}
+	}
+	return nil, fmt.Errorf("%s", errMsg)
+}
+
+func isTextContentType(contentType string) bool {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(mediaType, "text/") ||
+		mediaType == "application/json" || strings.HasSuffix(mediaType, "+json") ||
+		mediaType == "application/xml" || strings.HasSuffix(mediaType, "+xml") ||
+		mediaType == "application/x-www-form-urlencoded"
 }
 
 // SendContentRequest sends content related requests
 // this function is used for getting, updating and deleting content
-func (a *API) SendContentRequest(ep *url.URL, method string, c *Content) (*Content, error) {
+func (a *API) SendContentRequest(ctx context.Context, ep *url.URL, method string, c *Content) (*Content, error) {
 
 	var body io.Reader
 	if c != nil {
@@ -82,10 +126,10 @@ func (a *API) SendContentRequest(ep *url.URL, method string, c *Content) (*Conte
 		if err != nil {
 			return nil, err
 		}
-		body = strings.NewReader(string(js))
+		body = bytes.NewReader(js)
 	}
 
-	req, err := http.NewRequest(method, ep.String(), body)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -109,66 +153,10 @@ func (a *API) SendContentRequest(ep *url.URL, method string, c *Content) (*Conte
 	return &content, nil
 }
 
-// SendContentAttachmentRequest sends a multipart/form-data attachment create/update request to a content
-func (a *API) SendContentAttachmentRequest(ep *url.URL, attachmentName string, attachment io.Reader, params map[string]string) (*Search, error) {
-	// setup body for mulitpart file, adding minorEdit option
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	err := writer.WriteField("minorEdit", "true")
-	if err != nil {
-		return nil, err
-	}
-
-	part, err := writer.CreateFormFile("file", attachmentName)
-	if err != nil {
-		return nil, err
-	}
-
-	// add attachment to body
-	_, err = io.Copy(part, attachment)
-	if err != nil {
-		return nil, err
-	}
-
-	// add any other params
-	for key, val := range params {
-		_ = writer.WriteField(key, val)
-	}
-
-	//clean up multipart form writer
-	err = writer.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", ep.String(), body) // will always be put
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("X-Atlassian-Token", "nocheck") // required by api
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	// https://developer.atlassian.com/cloud/confluence/rest/#api-api-content-id-child-attachment-put
-
-	res, err := a.Request(req)
-	if err != nil {
-		return nil, err
-	}
-
-	var search Search
-
-	err = json.Unmarshal(res, &search)
-	if err != nil {
-		return nil, err
-	}
-
-	return &search, nil
-}
-
 // SendUserRequest sends user related requests
-func (a *API) SendUserRequest(ep *url.URL, method string) (*User, error) {
+func (a *API) SendUserRequest(ctx context.Context, ep *url.URL, method string) (*User, error) {
 
-	req, err := http.NewRequest(method, ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +177,9 @@ func (a *API) SendUserRequest(ep *url.URL, method string) (*User, error) {
 }
 
 // SendSearchRequest sends search related requests
-func (a *API) SendSearchRequest(ep *url.URL, method string) (*Search, error) {
+func (a *API) SendSearchRequest(ctx context.Context, ep *url.URL, method string) (*Search, error) {
 
-	req, err := http.NewRequest(method, ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -212,9 +200,9 @@ func (a *API) SendSearchRequest(ep *url.URL, method string) (*Search, error) {
 }
 
 // SendHistoryRequest requests history
-func (a *API) SendHistoryRequest(ep *url.URL, method string) (*History, error) {
+func (a *API) SendHistoryRequest(ctx context.Context, ep *url.URL, method string) (*History, error) {
 
-	req, err := http.NewRequest(method, ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +223,7 @@ func (a *API) SendHistoryRequest(ep *url.URL, method string) (*History, error) {
 }
 
 // SendLabelRequest requests history
-func (a *API) SendLabelRequest(ep *url.URL, method string, labels *[]Label) (*Labels, error) {
+func (a *API) SendLabelRequest(ctx context.Context, ep *url.URL, method string, labels *[]Label) (*Labels, error) {
 
 	var body io.Reader
 	if labels != nil {
@@ -243,10 +231,10 @@ func (a *API) SendLabelRequest(ep *url.URL, method string, labels *[]Label) (*La
 		if err != nil {
 			return nil, err
 		}
-		body = strings.NewReader(string(js))
+		body = bytes.NewReader(js)
 	}
 
-	req, err := http.NewRequest(method, ep.String(), body)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -274,32 +262,10 @@ func (a *API) SendLabelRequest(ep *url.URL, method string, labels *[]Label) (*La
 	return &Labels{}, nil
 }
 
-// SendWatcherRequest requests watchers
-func (a *API) SendWatcherRequest(ep *url.URL, method string) (*Watchers, error) {
-
-	req, err := http.NewRequest(method, ep.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := a.Request(req)
-	if err != nil {
-		return nil, err
-	}
-	var watchers Watchers
-
-	err = json.Unmarshal(res, &watchers)
-	if err != nil {
-		return nil, err
-	}
-
-	return &watchers, nil
-}
-
 // SendAllSpacesRequest sends a request for all spaces
-func (a *API) SendAllSpacesRequest(ep *url.URL, method string) (*AllSpaces, error) {
+func (a *API) SendAllSpacesRequest(ctx context.Context, ep *url.URL, method string) (*AllSpaces, error) {
 
-	req, err := http.NewRequest(method, ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -320,9 +286,9 @@ func (a *API) SendAllSpacesRequest(ep *url.URL, method string) (*AllSpaces, erro
 }
 
 // SendContentVersionRequest requests a version of a specific content
-func (a *API) SendContentVersionRequest(ep *url.URL, method string) (*ContentVersionResult, error) {
+func (a *API) SendContentVersionRequest(ctx context.Context, ep *url.URL, method string) (*ContentVersionResult, error) {
 
-	req, err := http.NewRequest(method, ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}

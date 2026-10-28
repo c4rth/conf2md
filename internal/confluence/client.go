@@ -1,43 +1,47 @@
 package confluence
 
 import (
-	"github.com/rs/zerolog/log"
+	"context"
+	"fmt"
 
 	"conf2md/internal/config"
 	"conf2md/internal/goconfluence"
+	"github.com/rs/zerolog/log"
 )
 
 func NewConfluenceAPI(args *config.CmdLineArgs) (*goconfluence.API, error) {
-	if args.Debug {
-		goconfluence.SetDebug(true)
-	}
-	api, err := goconfluence.NewAPI(args.ConfluenceUrl, "", args.Token)
+	api, err := goconfluence.NewAPI(args.ConfluenceUrl, args.ConfluenceApi, "", args.Token)
 	if err != nil {
-		log.Error().Err(err).Msg("Error creating Confluence API")
 		return nil, err
 	}
 	api.VerifyTLS(false)
+	api.SetTimeout(args.Timeout)
 	return api, nil
 }
 
-func GetConfluencePage(api *goconfluence.API, pageID string) (*goconfluence.Content, error) {
-	c, err := api.GetContentByID(pageID, goconfluence.ContentQuery{
+func GetConfluencePage(ctx context.Context, api *goconfluence.API, pageID string) (*goconfluence.Content, error) {
+	c, err := api.GetContentByID(ctx, pageID, goconfluence.ContentQuery{
 		Expand: []string{"body.storage", "children.page"},
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get content by ID")
-		return nil, err
+		return nil, fmt.Errorf("get content by ID: %w", err)
 	}
 
 	return c, nil
 }
 
-func GetChildPages(api *goconfluence.API, parentID string) (*goconfluence.Search, error) {
-	c, err := api.GetChildPages(parentID)
+func SearchPageID(ctx context.Context, api *goconfluence.API, spaceKey string, pageTitle string) (string, error) {
+	s, err := api.Search(ctx, goconfluence.SearchQuery{
+		CQL: fmt.Sprintf("space=\"%s\"+AND+title=\"%s\"", spaceKey, pageTitle),
+	})
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get children")
-		return nil, err
+		return "", fmt.Errorf("searching page ID: %w", err)
 	}
-
-	return c, nil
+	if len(s.Results) == 0 {
+		return "", fmt.Errorf("no page found with title '%s' in space '%s'", pageTitle, spaceKey)
+	}
+	if len(s.Results) > 1 {
+		log.Warn().Msgf("multiple pages found with title '%s' in space '%s' -> take the 1st one", pageTitle, spaceKey)
+	}
+	return s.Results[0].Content.ID, nil
 }

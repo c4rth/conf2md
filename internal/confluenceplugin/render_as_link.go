@@ -1,6 +1,7 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
+	"conf2md/internal/storage"
 	"strings"
 
 	"github.com/JohannesKaufmann/dom"
@@ -16,8 +17,7 @@ func (cp *confluencePlugin) renderAsLink(ctx converter.Context, w converter.Writ
 	})
 	if linkType != nil {
 		name := dom.GetAttributeOr(linkType, "ri:filename", "")
-		// TODO sanitize
-		w.WriteString("[" + name + "](attachments/" + name + ")")
+		WriteString(w, "["+name+"](attachments/"+storage.SanitizeFilename(name)+")")
 		return converter.RenderSuccess
 	}
 	// page
@@ -36,8 +36,8 @@ func (cp *confluencePlugin) renderAsLink(ctx converter.Context, w converter.Writ
 		link := title
 		if bodyLink != nil {
 			link = bodyLink.Data
-		} 
-		w.WriteString("[" + link + "](" + title + anchor + ")")
+		}
+		WriteString(w, "["+link+"]("+title+anchor+")")
 		return converter.RenderSuccess
 	}
 	// user
@@ -45,7 +45,7 @@ func (cp *confluencePlugin) renderAsLink(ctx converter.Context, w converter.Writ
 		return dom.NodeName(n) == "ri:user"
 	})
 	if linkType != nil {
-		log.Warn().Msg("User link NOT supported")
+		log.Warn().Msg("user link NOT supported")
 		return converter.RenderSuccess
 	}
 	// anchor
@@ -57,8 +57,8 @@ func (cp *confluencePlugin) renderAsLink(ctx converter.Context, w converter.Writ
 		link := ""
 		if bodyLink != nil {
 			link = bodyLink.Data
-		} 
-		w.WriteString("[" + link + "](" + "#" + strings.ReplaceAll(anchor, " ", "-") + ")")
+		}
+		WriteString(w, "["+link+"]("+"#"+strings.ReplaceAll(anchor, " ", "-")+")")
 		return converter.RenderSuccess
 	}
 

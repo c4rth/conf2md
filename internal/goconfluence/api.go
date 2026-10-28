@@ -7,7 +7,12 @@ import (
 
 // API is the main api data structure
 type API struct {
-	endPoint        *url.URL
+	BaseURL         *url.URL
+	Subpath         string
 	Client          *http.Client
 	username, token string
+}
+
+func (a *API) getEndpoint(path string) (*url.URL, error) {
+	return url.ParseRequestURI(a.BaseURL.String() + a.Subpath + path)
 }

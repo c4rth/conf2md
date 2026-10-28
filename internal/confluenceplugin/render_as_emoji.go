@@ -1,4 +1,4 @@
-package confluence_plugin
+package confluenceplugin
 
 import (
 	"github.com/JohannesKaufmann/dom"
@@ -11,8 +11,9 @@ func (cp *confluencePlugin) renderAsEmoticon(ctx converter.Context, w converter.
 	if found {
 		emoji := GetEmoji(emojiId)
 		if emoji != "" {
-			w.WriteString(emoji + " ")
+			WriteString(w, emoji+" ")
 		}
+		return converter.RenderSuccess
 	}
 	return converter.RenderTryNext
 }

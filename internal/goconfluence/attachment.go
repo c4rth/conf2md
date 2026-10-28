@@ -1,6 +1,7 @@
 package goconfluence
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -8,12 +9,12 @@ import (
 )
 
 type Attachment struct {
-	MediaTypeDescription string      `json:"mediaTypeDescription"`
-	WebuiLink            string      `json:"webuiLink"`
-	DownloadLink         string      `json:"downloadLink"`
-	CreatedAt            interface{} `json:"createdAt"`
-	ID                   string      `json:"id"`
-	Comment              string      `json:"comment"`
+	MediaTypeDescription string `json:"mediaTypeDescription"`
+	WebuiLink            string `json:"webuiLink"`
+	DownloadLink         string `json:"downloadLink"`
+	CreatedAt            any    `json:"createdAt"`
+	ID                   string `json:"id"`
+	Comment              string `json:"comment"`
 	Version              struct {
 		Number    int       `json:"number"`
 		Message   string    `json:"message"`
@@ -35,16 +36,16 @@ type Attachment struct {
 
 // getAttachmentEndpoint creates the correct api endpoint by given id
 func (a *API) getAttachmentEndpoint(id string) (*url.URL, error) {
-	return url.ParseRequestURI(a.endPoint.String() + "/attachments/" + id)
+	return a.getEndpoint("/attachments/" + id)
 }
 
-// Get info on specific attachment by id
-func (a *API) GetAttachmentById(id string) (*Attachment, error) {
+// GetAttachmentById Get info on specific attachment by id
+func (a *API) GetAttachmentById(ctx context.Context, id string) (*Attachment, error) {
 	ep, err := a.getAttachmentEndpoint(id)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("GET", ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +64,13 @@ func (a *API) GetAttachmentById(id string) (*Attachment, error) {
 	return &attachment, nil
 }
 
-// Get attachment by download URL
-func (a *API) GetAttachmentByUrl(downloadUrl string) (*[]byte, error) {
-	// ep, err := url.ParseRequestURI(a.endPoint.String() + downloadUrl)
-	ep, err := url.ParseRequestURI(a.endPoint.String() + "/content/294917/child/attachment/att851972/download")
+// GetAttachmentByUrl Get attachment by download URL
+func (a *API) GetAttachmentByUrl(ctx context.Context, downloadUrl string) (*[]byte, error) {
+	ep, err := url.ParseRequestURI(a.BaseURL.String() + downloadUrl)
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("GET", ep.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.String(), nil)
 	if err != nil {
 		return nil, err
 	}
