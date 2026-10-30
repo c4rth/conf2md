@@ -40,7 +40,7 @@ func TestMkDocToString(t *testing.T) {
 		t.Errorf("navigation = %#v, want %#v", config.Nav, wantNavigation)
 	}
 	if config.RepoURL != "https://<REPO_URL>" || config.EditURI != "?path=<PATH>" ||
-		config.Theme.Name != "material" || len(config.Plugins) != 3 {
+		config.Theme.Name != "material" || len(config.Plugins) != 2 {
 		t.Errorf("generated configuration lost static settings: %+v", config)
 	}
 }
