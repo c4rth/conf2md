@@ -96,11 +96,11 @@ func convertLocal(args *config.CmdLineArgs, mkDoc *mkdocs.MkDoc) error {
 		return fmt.Errorf("converting local file '%s' to Markdown: %w", fileFullPath, err)
 	}
 	// output file
-	outFile := filepath.Join(args.OutputDir, "docs", fileName+".md")
+	outFile := filepath.Join(args.OutputDir, "docs", "index.md")
 	// mkdocs
 	mkDoc.AddChild(mkdocs.NewMkDocs(
 		fileName,
-		filepath.Base(fileFullPath)+".md",
+		"index.md",
 	))
 	// write output
 	err = storage.WriteFile(outFile, md)

@@ -10,17 +10,9 @@ import (
 
 // TextFormatTag maps inline formatting tags to the Markdown delimiter wrapped around their content.
 var TextFormatTag = map[string]string{
-	"u":      "^^",
-	"sub":    "~",
-	"sup":    "^",
-	"strong": "**",
-	"b":      "**",
-	"em":     "_",
-	"i":      "_",
-	"s":      "~~",
-	"del":    "~~",
-	"pre":    "`",
-	"span":   "==",
+	"pre":  "`",
+	"span": "==",
+	"u":    "ins",
 }
 
 func (cp *confluencePlugin) isTextFormatTag(name string) bool {
@@ -34,9 +26,18 @@ func (cp *confluencePlugin) renderTextFormatting(ctx converter.Context, w conver
 		return cp.renderPreCode(ctx, w, node)
 	case "span":
 		return cp.renderSpan(ctx, w, node)
+	case "u":
+		return cp.renderTextWithTag(ctx, w, node, TextFormatTag[name])
 	default:
 		return cp.renderTextWithDelimiter(ctx, w, node, TextFormatTag[name])
 	}
+}
+
+func (cp *confluencePlugin) renderTextWithTag(ctx converter.Context, w converter.Writer, node *html.Node, tag string) converter.RenderStatus {
+	WriteString(w, "<"+tag+">")
+	ctx.RenderChildNodes(ctx, w, node)
+	WriteString(w, "</"+tag+">")
+	return converter.RenderSuccess
 }
 
 func (cp *confluencePlugin) renderTextWithDelimiter(ctx converter.Context, w converter.Writer, node *html.Node, delimiter string) converter.RenderStatus {

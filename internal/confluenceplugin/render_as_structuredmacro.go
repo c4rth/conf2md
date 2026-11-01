@@ -121,7 +121,10 @@ func renderMacroCode(w converter.Writer, node *html.Node) converter.RenderStatus
 		WriteString(w, "??? code \""+title+"\"\n")
 		WriteString(w, "    ```"+language+"\n")
 		if content != "" {
-			WriteString(w, "    "+strings.ReplaceAll(content, "\n", "\n    "))
+			content = strings.ReplaceAll(content, "\\n", "\n")
+			content = strings.ReplaceAll(content, "<br/>", "\n")
+			content = strings.ReplaceAll(content, "\n", "\n    ")
+			WriteString(w, "    "+content)
 		}
 		WriteString(w, "\n    ```")
 	} else {
@@ -280,7 +283,7 @@ func renderMacroTabNav(ctx converter.Context, w converter.Writer, node *html.Nod
 	if name == "" {
 		name = "Tab"
 	}
-	WriteString(w, "\n=== \"<span style=\"font-size: 1rem\">"+name+"</span>\"")
+	WriteString(w, "\n=== \"<span style=\"font-size: 1rem\">"+name+"</span>\"\n")
 	richTextNode := dom.FindFirstNode(node, func(n *html.Node) bool {
 		return dom.NodeName(n) == "ac:rich-text-body"
 	})

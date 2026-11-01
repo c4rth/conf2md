@@ -1,12 +1,17 @@
 package confluenceplugin
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/JohannesKaufmann/dom"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html"
+)
+
+const (
+	leadingHashMarker    = "CONF2MDLEADINGHASH"
 )
 
 type confluencePlugin struct {
@@ -23,7 +28,16 @@ func (cp *confluencePlugin) Name() string {
 
 func (cp *confluencePlugin) Init(conv *converter.Converter) error {
 	conv.Register.Renderer(cp.handleRender, converter.PriorityEarly)
+	conv.Register.TextTransformer(cp.textTransform, converter.PriorityEarly)
+	conv.Register.PostRenderer(cp.restoreLeadingHashes, converter.PriorityLate)
 	return nil
+}
+
+func (cp *confluencePlugin) textTransform(ctx converter.Context, content string) string {
+	if strings.HasPrefix(content, "#") {
+		content = leadingHashMarker + content[1:]
+	}
+	return content
 }
 
 func (cp *confluencePlugin) handleRender(ctx converter.Context, w converter.Writer, n *html.Node) converter.RenderStatus {
@@ -41,7 +55,7 @@ func (cp *confluencePlugin) handleRender(ctx converter.Context, w converter.Writ
 	case "ac:image":
 		return cp.renderAsImage(ctx, w, n)
 	case "ac:inline-comment-marker":
-		return cp.renderBlock(ctx, w, n.FirstChild)
+		return cp.renderInlineCommentMarker(ctx, w, n)
 	case "ac:task-list":
 		return cp.renderAsTaskList(ctx, w, n)
 	case "ac:parameter":
@@ -67,22 +81,12 @@ func (cp *confluencePlugin) handleRender(ctx converter.Context, w converter.Writ
 	return converter.RenderTryNext
 }
 
-func (cp *confluencePlugin) renderBlock(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {
-	if node == nil {
-		return converter.RenderSuccess
-	}
+func (cp *confluencePlugin) restoreLeadingHashes(_ converter.Context, content []byte) []byte {
+	return bytes.ReplaceAll(content, []byte(leadingHashMarker), []byte(`\#`))
+}
 
-	tagName := dom.NodeName(node)
-	tagType, _ := ctx.GetTagType(tagName)
-
-	if tagType == converter.TagTypeBlock {
-		WriteString(w, "\n\n")
-	}
-	ctx.RenderChildNodes(ctx, w, node)
-	if tagType == converter.TagTypeBlock {
-		WriteString(w, "\n\n")
-	}
-
+func (cp *confluencePlugin) renderInlineCommentMarker(ctx converter.Context, w converter.Writer, n *html.Node) converter.RenderStatus {
+	ctx.RenderChildNodes(ctx, w, n)
 	return converter.RenderSuccess
 }
 
