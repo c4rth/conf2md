@@ -221,7 +221,6 @@ func WriteString(w converter.Writer, s string) {
 	_, _ = w.WriteString(s)
 }
 
-
 func Write(w converter.Writer, b []byte) {
 	_, _ = w.Write(b)
 }

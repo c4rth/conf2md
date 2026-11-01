@@ -181,7 +181,6 @@ type ContentSearch struct {
 	Size    int       `json:"size,omitempty"`
 }
 
-
 // addQueryParameters add the given url.Values into a query string without escaping (for Confluence CQL)
 func addQueryParameters(v url.Values) string {
 	if len(v) == 0 {

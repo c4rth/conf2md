@@ -72,12 +72,12 @@ func TestConvertObject(t *testing.T) {
 			converter: &converter{
 				translations: map[string]string{},
 				resources: indexResources([]Resource{
-					{ID: 1, Data: "<svg/>"},
+					{ID: "1", Data: "<svg/>"},
 				}),
 			},
 			object: &Object{
 				ID:      "svg-1",
-				Graphic: &Graphic{Type: GraphicTypeSVG, SVG: &SVG{EmbeddedResourceID: new(1)}},
+				Graphic: &Graphic{Type: GraphicTypeSVG, SVG: &SVG{EmbeddedResourceID: new("1")}},
 			},
 			want: objectConversion{
 				style:    "shape=image;imageAspect=0;image=data:image/svg+xml,PHN2Zy8+;gliffyId=svg-1;",

@@ -12,7 +12,7 @@ type mkDocsConfig struct {
 	RepoURL  string `yaml:"repo_url"`
 	EditURI  string `yaml:"edit_uri"`
 	Theme    struct {
-		Name string `yaml:"name"`
+		Name     string   `yaml:"name"`
 		Features []string `yaml:"features"`
 	} `yaml:"theme"`
 	Nav     []any `yaml:"nav"`

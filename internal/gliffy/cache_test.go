@@ -39,21 +39,21 @@ func TestCachedTranslationsNoAllocations(t *testing.T) {
 func TestResourceData(t *testing.T) {
 	tests := []struct {
 		name    string
-		id      *int
+		id      *string
 		want    string
 		warning string
 	}{
-		{"existing", new(1), "<svg/>", ""},
-		{"empty", new(2), "", "embedded SVG resource 2 is empty"},
-		{"missing", new(3), "", "embedded SVG resource 3 was not found"},
+		{"existing", new("1"), "<svg/>", ""},
+		{"empty", new("2"), "", "embedded SVG resource 2 is empty"},
+		{"missing", new("3"), "", "embedded SVG resource 3 was not found"},
 		{"nil ID", nil, "", "embedded SVG resource ID is missing"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &converter{resources: indexResources([]Resource{
-				{ID: 1, Data: "<svg/>"},
-				{ID: 1, Data: "duplicate"},
-				{ID: 2},
+				{ID: "1", Data: "<svg/>"},
+				{ID: "1", Data: "duplicate"},
+				{ID: "2"},
 			})}
 			if got := c.resourceData(tt.id); got != tt.want {
 				t.Errorf("resourceData() = %q, want %q", got, tt.want)
@@ -80,8 +80,37 @@ func TestConvertIndexesResourcesPerDiagram(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if len(result.Warnings) != 0 || !bytes.Contains(result.XML, []byte("image=data:image/svg+xml,"+base64.StdEncoding.EncodeToString([]byte(data))+";")) {
 			t.Errorf("SVG resource not converted: %+v", result)
 		}
+	}
+}
+
+func TestConvertResourceIdentifierFormats(t *testing.T) {
+	tests := []struct {
+		name     string
+		resource string
+		ref      string
+	}{
+		{"integer", "1", "1"},
+		{"numeric string resource", `"1"`, "1"},
+		{"numeric string reference", "1", `"1"`},
+		{"string", `"svg-resource-abc"`, `"svg-resource-abc"`},
+		{"large integer", "9007199254740993", `"9007199254740993"`},
+		{"zero", "0", `"0"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := `{"embeddedResources":{"resources":[{"id":` + tt.resource + `,"data":"<svg/>"}]},
+				"stage":{"objects":[{"id":"svg","graphic":{"type":"Svg","Svg":{"embeddedResourceId":` + tt.ref + `}}}]}}`
+			result, err := Convert([]byte(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Warnings) != 0 || !bytes.Contains(result.XML, []byte("image=data:image/svg+xml,PHN2Zy8+;")) {
+				t.Errorf("SVG resource not converted: %+v", result)
+			}
+		})
 	}
 }

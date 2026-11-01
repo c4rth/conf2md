@@ -80,7 +80,7 @@ func Convert(input []byte) (Result, error) {
 type converter struct {
 	diagram      *Diagram
 	translations map[string]string
-	resources    map[int]string
+	resources    map[string]string
 	cells        []MxCell
 	layerIDs     map[string]string
 	nextID       int
@@ -108,11 +108,11 @@ func loadTranslations() (map[string]string, error) {
 	return translations, nil
 }
 
-func indexResources(resources []Resource) map[int]string {
+func indexResources(resources []Resource) map[string]string {
 	if len(resources) == 0 {
 		return nil
 	}
-	index := make(map[int]string, len(resources))
+	index := make(map[string]string, len(resources))
 	for _, resource := range resources {
 		// Preserve the first match, as with the previous linear lookup.
 		if _, exists := index[resource.ID]; !exists {
@@ -444,18 +444,18 @@ func javaDecimal(v float64) string {
 	return s
 }
 
-func (c *converter) resourceData(id *int) string {
+func (c *converter) resourceData(id *string) string {
 	if id == nil {
 		c.warnings = append(c.warnings, "embedded SVG resource ID is missing")
 		return ""
 	}
 	if data, found := c.resources[*id]; found {
 		if data == "" {
-			c.warnings = append(c.warnings, fmt.Sprintf("embedded SVG resource %d is empty", *id))
+			c.warnings = append(c.warnings, fmt.Sprintf("embedded SVG resource %s is empty", *id))
 		}
 		return data
 	}
-	c.warnings = append(c.warnings, fmt.Sprintf("embedded SVG resource %d was not found", *id))
+	c.warnings = append(c.warnings, fmt.Sprintf("embedded SVG resource %s was not found", *id))
 	return ""
 }
 

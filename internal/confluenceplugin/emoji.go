@@ -9,7 +9,7 @@ import (
 )
 
 //go:embed emoji.json
-var emojiJson []byte 
+var emojiJson []byte
 
 var emojiMap map[string]string
 var emojiOnce sync.Once
