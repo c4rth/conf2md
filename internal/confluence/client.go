@@ -3,9 +3,11 @@ package confluence
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"conf2md/internal/config"
 	"conf2md/internal/goconfluence"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -30,9 +32,12 @@ func GetConfluencePage(ctx context.Context, api *goconfluence.API, pageID string
 	return c, nil
 }
 
-func SearchPageID(ctx context.Context, api *goconfluence.API, spaceKey string, pageTitle string) (string, error) {
-	s, err := api.Search(ctx, goconfluence.SearchQuery{
-		CQL: fmt.Sprintf("space=\"%s\"+AND+title=\"%s\"", spaceKey, pageTitle),
+func GetPageID(ctx context.Context, api *goconfluence.API, spaceKey string, pageTitle string) (string, error) {
+	spaceKey = strings.Trim(spaceKey, `'"`)
+	pageTitle = strings.Trim(pageTitle, `'"`)
+	s, err := api.GetContent(ctx, goconfluence.ContentQuery{
+		SpaceKey: spaceKey,
+		Title:    pageTitle,
 	})
 	if err != nil {
 		return "", fmt.Errorf("searching page ID: %w", err)
@@ -43,5 +48,5 @@ func SearchPageID(ctx context.Context, api *goconfluence.API, spaceKey string, p
 	if len(s.Results) > 1 {
 		log.Warn().Msgf("multiple pages found with title '%s' in space '%s' -> take the 1st one", pageTitle, spaceKey)
 	}
-	return s.Results[0].Content.ID, nil
+	return s.Results[0].ID, nil
 }

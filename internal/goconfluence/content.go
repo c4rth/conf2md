@@ -181,13 +181,42 @@ type ContentSearch struct {
 	Size    int       `json:"size,omitempty"`
 }
 
+
+// addQueryParameters add the given url.Values into a query string without escaping (for Confluence CQL)
+func addQueryParameters(v url.Values) string {
+	if len(v) == 0 {
+		return ""
+	}
+	var buf strings.Builder
+	// To minimize allocations, we eschew iterators and pre-size the slice in
+	// which we collect v's keys.
+	keys := make([]string, len(v))
+	var i int
+	for k := range v {
+		keys[i] = k
+		i++
+	}
+	for _, k := range keys {
+		vs := v[k]
+		for _, v := range vs {
+			if buf.Len() > 0 {
+				buf.WriteByte('&')
+			}
+			buf.WriteString(k)
+			buf.WriteByte('=')
+			buf.WriteString(v)
+		}
+	}
+	return buf.String()
+}
+
 // GetContent querys content using a query parameters
 func (a *API) GetContent(ctx context.Context, query ContentQuery) (*ContentSearch, error) {
 	ep, err := a.getContentEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	ep.RawQuery = addContentQueryParams(query).Encode()
+	ep.RawQuery = addQueryParameters(*addContentQueryParams(query))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ep.String(), nil)
 	if err != nil {

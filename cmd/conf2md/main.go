@@ -107,7 +107,7 @@ func newRootCommand() *cobra.Command {
 	command.Flags().StringVarP(&args.Page, "page", "p", "", "Confluence 'pageId', 'space/title' or file name with path (env: CONF2MD_PAGE)")
 	command.Flags().StringVarP(&args.OutputDir, "output", "o", "output", "Directory to save Markdown files (default: output, env: CONF2MD_OUTPUT)")
 	command.Flags().StringVarP(&args.ConfluenceUrl, "url", "u", "", "Confluence base URL (env: CONF2MD_URL)")
-	command.Flags().StringVarP(&args.ConfluenceApi, "api", "a", "/wiki/rest/api", "Confluence API endpoint (default: /wiki/rest/api, env: CONF2MD_API)")
+	command.Flags().StringVarP(&args.ConfluenceApi, "api", "a", "/rest/api", "Confluence API endpoint (default: /rest/api, env: CONF2MD_API)")
 	command.Flags().StringVarP(&args.Token, "token", "t", "", "Confluence API token (env: CONF2MD_TOKEN)")
 	command.Flags().BoolVarP(&args.ExportChildren, "children", "c", true, "export child pages (default: true, env: CONF2MD_CHILDREN)")
 	command.Flags().BoolVarP(&args.Local, "local", "l", false, "use local mode (env: CONF2MD_LOCAL)")
