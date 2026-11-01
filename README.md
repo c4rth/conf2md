@@ -38,11 +38,6 @@ go test -tags emojigen ./internal/confluenceplugin -run '^TestGenerateEmojiMap$'
 
 If present, `.env` in the current working directory is loaded automatically:
 
-```dotenv
-CONF2MD_URL=https://<domain>.atlassian.net
-CONF2MD_TOKEN=your-api-token
-```
-
 All options use the same precedence: explicit flags, environment variables,
 `.env`, `config.yaml` (or another Viper-supported `config` file in the current
 directory), then flag defaults. Existing environment variables are not
@@ -70,6 +65,24 @@ Press Ctrl-C (or send `SIGTERM`) to cancel an in-progress export.
 A missing `.env` is allowed; an unreadable or malformed file logs a warning.
 Invalid configuration files stop the command with an error. Keep API tokens out
 of version control; `.env` is already ignored.
+
+#### Cloud Token - scopes
+
+- Readonly
+    - readonly:content.attachment:confluence
+- Search
+    - search:confluence
+- Read
+    - readonly:content.attachment:confluence
+    - read:account
+    - read:confluence-content.all
+    - read:confluence-content.permission
+    - read:confluence-content.summary
+    - read:confluence-groups
+    - read:confluence-props
+    - read:confluence-space.summary
+    - read:confluence-user
+    - read:me
 
 ### Debug logs
 ```

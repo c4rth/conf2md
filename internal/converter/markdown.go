@@ -24,7 +24,7 @@ import (
 	"conf2md/internal/goconfluence"
 	"conf2md/internal/mkdocs"
 	"conf2md/internal/storage"
-	"conf2md/internal/tableplugin"
+	table "conf2md/internal/tableplugin"
 )
 
 var plainTextBody = regexp.MustCompile(
@@ -64,7 +64,7 @@ func ConvertConfluenceToMarkdown(ctx context.Context, args *config.CmdLineArgs) 
 		err = convertConfluence(ctx, args, mkDoc)
 	}
 	if err != nil {
-		return fmt.Errorf("converting page '%s': %w", args.Page, err)
+		return err
 	}
 	if args.Mkdocs {
 		mkDocsYaml, err := mkDoc.GenerateMkDocs()
@@ -183,7 +183,7 @@ func (c *Crawler) retrievePageID() (string, error) {
 	if c.args.Space == "" {
 		return c.args.Page, nil
 	}
-	pageID, err := confluence.SearchPageID(c.ctx, c.api, c.args.Space, c.args.Page)
+	pageID, err := confluence.GetPageID(c.ctx, c.api, c.args.Space, c.args.Page)
 	if err != nil {
 		return "", err
 	}
