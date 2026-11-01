@@ -23,7 +23,7 @@ type EmbeddedResources struct {
 }
 
 type Resource struct {
-	ID       int    `json:"id"`
+	ID       string `json:"id"`
 	MimeType string `json:"mimeType"`
 	Data     string `json:"data"`
 }
@@ -132,7 +132,7 @@ type Image struct {
 }
 
 type SVG struct {
-	EmbeddedResourceID *int `json:"embeddedResourceId"`
+	EmbeddedResourceID *string `json:"embeddedResourceId"`
 }
 
 type PopupNote struct {
@@ -194,6 +194,46 @@ func identifier(raw json.RawMessage) (string, error) {
 		return "", fmt.Errorf("invalid Gliffy identifier %s: %w", raw, err)
 	}
 	return number.String(), nil
+}
+
+func (r *Resource) UnmarshalJSON(data []byte) error {
+	type plain Resource
+	var decoded struct {
+		*plain
+		ID json.RawMessage `json:"id"`
+	}
+	decoded.plain = (*plain)(r)
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	id, err := identifier(decoded.ID)
+	if err != nil {
+		return err
+	}
+	r.ID = id
+	return nil
+}
+
+func (s *SVG) UnmarshalJSON(data []byte) error {
+	type plain SVG
+	var decoded struct {
+		*plain
+		EmbeddedResourceID json.RawMessage `json:"embeddedResourceId"`
+	}
+	decoded.plain = (*plain)(s)
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	s.EmbeddedResourceID = nil
+	if len(decoded.EmbeddedResourceID) == 0 || string(decoded.EmbeddedResourceID) == "null" {
+		return nil
+	}
+	id, err := identifier(decoded.EmbeddedResourceID)
+	if err != nil {
+		return err
+	}
+	s.EmbeddedResourceID = &id
+	return nil
 }
 
 func (o *Object) UnmarshalJSON(data []byte) error {

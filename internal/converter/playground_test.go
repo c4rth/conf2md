@@ -12,7 +12,7 @@ import (
 
 func TestPlaygroundDiagram(t *testing.T) {
 	baseDir := filepath.Join("..", "..", "tests", "gliffy")
-	files := []string{"test_1.gliffy", "test_2.gliffy", "test_3.gliffy", "test_4.gliffy", "test_6.gliffy"}
+	files := []string{"test_1.gliffy", "test_2.gliffy", "test_3.gliffy", "test_4.gliffy", "test_6.gliffy", "test_7.gliffy", "test_8.gliffy", "test_9.gliffy", "test_10.gliffy"}
 	for _, file := range files {
 		t.Run(file, func(t *testing.T) {
 			path := filepath.Join(baseDir, file)

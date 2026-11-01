@@ -1,5 +1,5 @@
 //go:build emojigen
- 
+
 package confluenceplugin
 
 import (
