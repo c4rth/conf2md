@@ -125,7 +125,7 @@ func (cp *confluencePlugin) renderAdfMultiBodiedExtension(ctx converter.Context,
 		title := getAdfParameterKey(tab, "title")
 		WriteString(w, "\n=== \""+title+"\"\n")
 		if i < len(tabsContent) {
-			writeIndentedChildNode(ctx, w, tabsContent[i])
+			writeIndentedNode(ctx, w, tabsContent[i])
 			WriteString(w, "\n")
 		}
 	}

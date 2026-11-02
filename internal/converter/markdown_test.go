@@ -60,7 +60,7 @@ func TestConvertConfluenceToMarkdownPreservesUnderlineWithBold(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := "<u>**right click**</u>"; string(got) != want {
+	if want := "<ins>**right click**</ins>"; string(got) != want {
 		t.Errorf("Markdown = %q, want %q", got, want)
 	}
 }
@@ -87,6 +87,29 @@ func TestConvertConfluenceToMarkdownListEndsWithNewline(t *testing.T) {
 	}
 }
 
+func TestConvertConfluenceToMarkdownOrderedListNumbering(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{"start attribute", `<ol start="4"><li>first</li><li>second</li></ol>`, "4. first\n5. second\n"},
+		{"item value", `<ol><li>first</li><li value="7">second</li><li>third</li></ol>`, "1. first\n7. second\n8. third\n"},
+		{"reversed", `<ol reversed><li>first</li><li>second</li></ol>`, "2. first\n1. second\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertConfluenceToMarkdown(tt.html)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Markdown = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConvertConfluenceToMarkdownAddsNewlineAfterEachList(t *testing.T) {
 	got, err := convertConfluenceToMarkdown("<ul><li>outer<ul><li>inner</li></ul>after inner list</li></ul>after outer list<ol><li>last</li></ol>after ordered list")
 	if err != nil {
@@ -99,10 +122,12 @@ func TestConvertConfluenceToMarkdownAddsNewlineAfterEachList(t *testing.T) {
 			t.Fatalf("Markdown %q does not contain %q", got, text)
 		}
 		prefix := bytes.TrimRight(got[:index], " \t")
-		if !bytes.HasSuffix(prefix, []byte("\n")) {
-			t.Errorf("Markdown does not have a newline before %q: %q", text, got)
-		} else if len(prefix) > 1 && prefix[len(prefix)-2] == '\n' {
-			t.Errorf("Markdown has more than one newline before %q: %q", text, got)
+		newlineCount := 0
+		for i := len(prefix) - 1; i >= 0 && prefix[i] == '\n'; i-- {
+			newlineCount++
+		}
+		if newlineCount != 2 {
+			t.Errorf("Markdown has %d newlines before %q, want 2: %q", newlineCount, text, got)
 		}
 	}
 }
@@ -308,7 +333,7 @@ func TestConvertConfluenceToMarkdownTextFormatting(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"<p><u>x</u></p>", "<u>x</u>"},
+		{"<p><u>x</u></p>", "<ins>x</ins>"},
 		{"<p><sub>x</sub></p>", "~x~"},
 		{"<p><sup>x</sup></p>", "^x^"},
 		{"<p><strong>x</strong></p>", "**x**"},

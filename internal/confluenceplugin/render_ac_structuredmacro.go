@@ -14,7 +14,7 @@ import (
 	"conf2md/internal/storage"
 )
 
-func (cp *confluencePlugin) renderAsStructuredMacro(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {
+func (cp *confluencePlugin) renderAcStructuredMacro(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {
 	acName, found := dom.GetAttribute(node, "ac:name")
 	log.Debug().Str("name", acName).Msg("found structured macro")
 	if found {
@@ -63,10 +63,10 @@ func renderMacroAnchor(w converter.Writer, node *html.Node) converter.RenderStat
 	return converter.RenderSuccess
 }
 
-func writeIndentedChildNode(ctx converter.Context, w converter.Writer, childNode *html.Node) {
-	if childNode != nil {
+func writeIndentedNode(ctx converter.Context, w converter.Writer, node *html.Node) {
+	if node != nil {
 		var body bytes.Buffer
-		ctx.RenderNodes(ctx, &body, childNode)
+		ctx.RenderNodes(ctx, &body, node)
 		content := strings.Trim(body.String(), "\n")
 		if content != "" {
 			WriteString(w, "    "+strings.ReplaceAll(content, "\n", "\n    "))
@@ -78,9 +78,9 @@ func writeIndentedChildNode(ctx converter.Context, w converter.Writer, childNode
 
 func writeAdmonition(ctx converter.Context, w converter.Writer, acName, title string, collapsed bool, richTextNode *html.Node) {
 	if collapsed {
-		WriteString(w, "???")
+		WriteString(w, "\n???")
 	} else {
-		WriteString(w, "!!!")
+		WriteString(w, "\n!!!")
 	}
 	WriteString(w, " "+acName)
 	if strings.TrimSpace(title) != "" {
@@ -88,7 +88,7 @@ func writeAdmonition(ctx converter.Context, w converter.Writer, acName, title st
 	} else {
 		WriteString(w, " \""+strings.ToUpper(acName[0:1])+acName[1:]+"\"\n")
 	}
-	writeIndentedChildNode(ctx, w, richTextNode)
+	writeIndentedNode(ctx, w, richTextNode)
 	WriteString(w, "\n\n")
 }
 
@@ -288,7 +288,7 @@ func renderMacroTabNav(ctx converter.Context, w converter.Writer, node *html.Nod
 		return dom.NodeName(n) == "ac:rich-text-body"
 	})
 	if richTextNode != nil {
-		writeIndentedChildNode(ctx, w, richTextNode)
+		writeIndentedNode(ctx, w, richTextNode)
 		WriteString(w, "\n")
 	}
 	return converter.RenderSuccess

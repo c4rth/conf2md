@@ -13,6 +13,14 @@ var TextFormatTag = map[string]string{
 	"pre":  "`",
 	"span": "==",
 	"u":    "ins",
+	"sub":    "~",
+	"sup":    "^",
+	"strong": "**",
+	"b":      "**",
+	"em":     "_",
+	"i":      "_",
+	"s":      "~~",
+	"del":    "~~",
 }
 
 func (cp *confluencePlugin) isTextFormatTag(name string) bool {
