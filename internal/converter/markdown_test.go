@@ -30,6 +30,118 @@ func TestConvertConfluenceToMarkdownBytes(t *testing.T) {
 	}
 }
 
+func TestConvertConfluenceToMarkdownEscapesLeadingHash(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{"paragraph", "<p>#heading</p>", `\#heading`},
+		{"ordered list item", "<ol><li>#1 sample</li></ol>", "1. \\#1 sample\n"},
+		{"unordered list item", "<ul><li>#tag</li></ul>", "- \\#tag\n"},
+		{"heading content", "<h1>#title</h1>", "# \\#title"},
+		{"inline hash", "<p>text #tag</p>", "text #tag"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertConfluenceToMarkdown(tt.html)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Markdown = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvertConfluenceToMarkdownPreservesUnderlineWithBold(t *testing.T) {
+	got, err := convertConfluenceToMarkdown("<u><strong>right click</strong></u>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "<ins>**right click**</ins>"; string(got) != want {
+		t.Errorf("Markdown = %q, want %q", got, want)
+	}
+}
+
+func TestConvertConfluenceToMarkdownListEndsWithNewline(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{"ordered", "<ol><li>first</li><li>second</li></ol>", "1. first\n2. second\n"},
+		{"unordered", "<ul><li>first</li><li>second</li></ul>", "- first\n- second\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertConfluenceToMarkdown(tt.html)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Markdown = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvertConfluenceToMarkdownOrderedListNumbering(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{"start attribute", `<ol start="4"><li>first</li><li>second</li></ol>`, "4. first\n5. second\n"},
+		{"item value", `<ol><li>first</li><li value="7">second</li><li>third</li></ol>`, "1. first\n7. second\n8. third\n"},
+		{"reversed", `<ol reversed><li>first</li><li>second</li></ol>`, "2. first\n1. second\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := convertConfluenceToMarkdown(tt.html)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("Markdown = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestConvertConfluenceToMarkdownAddsNewlineAfterEachList(t *testing.T) {
+	got, err := convertConfluenceToMarkdown("<ul><li>outer<ul><li>inner</li></ul>after inner list</li></ul>after outer list<ol><li>last</li></ol>after ordered list")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, text := range []string{"after inner list", "after outer list", "after ordered list"} {
+		index := strings.Index(string(got), text)
+		if index == -1 {
+			t.Fatalf("Markdown %q does not contain %q", got, text)
+		}
+		prefix := bytes.TrimRight(got[:index], " \t")
+		newlineCount := 0
+		for i := len(prefix) - 1; i >= 0 && prefix[i] == '\n'; i-- {
+			newlineCount++
+		}
+		if newlineCount != 2 {
+			t.Errorf("Markdown has %d newlines before %q, want 2: %q", newlineCount, text, got)
+		}
+	}
+}
+
+func TestConvertConfluenceToMarkdownDoesNotAddNewlineAfterFollowingParagraph(t *testing.T) {
+	got, err := convertConfluenceToMarkdown("<ul><li>item</li></ul><p>After</p>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.HasSuffix(string(got), "\n") {
+		t.Errorf("Markdown = %q, should not have a final newline after a paragraph", got)
+	}
+}
+
 func TestUniqueChildPageNames(t *testing.T) {
 	children := []goconfluence.Results{
 		{ID: "10", Title: "A Page"},
@@ -221,7 +333,7 @@ func TestConvertConfluenceToMarkdownTextFormatting(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"<p><u>x</u></p>", "^^x^^"},
+		{"<p><u>x</u></p>", "<ins>x</ins>"},
 		{"<p><sub>x</sub></p>", "~x~"},
 		{"<p><sup>x</sup></p>", "^x^"},
 		{"<p><strong>x</strong></p>", "**x**"},
