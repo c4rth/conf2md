@@ -87,7 +87,7 @@ func (c *converter) convertTextObject(obj *Object, graphic *Graphic, geometry *M
 		if obj.parent.isLine() {
 			geometry = lineLabelGeometry(obj)
 			graphic.Text.halign = ""
-			writeStrings(&style, "labelBackgroundColor=", c.diagram.Stage.Background, ";")
+			writeStrings(&style, "labelBackgroundColor=", c.background, ";")
 		} else {
 			geometry.X, geometry.Y = "0", "0"
 			geometry.Width, geometry.Height = obj.parent.cell.Geometry.Width, obj.parent.cell.Geometry.Height
