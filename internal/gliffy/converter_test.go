@@ -2,7 +2,6 @@ package gliffy
 
 import (
 	"encoding/xml"
-	"os"
 	"testing"
 )
 
