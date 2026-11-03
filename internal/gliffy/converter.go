@@ -15,7 +15,7 @@ import (
 	"sync"
 )
 
-//go:embed gliffyTranslation.properties
+//go:embed gliffyMapping.properties
 var translationProperties string
 
 var cachedTranslations = sync.OnceValues(loadTranslations)
@@ -28,45 +28,101 @@ type Result struct {
 
 // Convert decodes a Gliffy diagram and converts it to a Draw.io graph model.
 func Convert(input []byte) (Result, error) {
-	var diagram Diagram
-	if err := json.Unmarshal(input, &diagram); err != nil {
+	version, err := getGliffyVersion(input)
+	if err != nil {
+		return Result{}, fmt.Errorf("detect Gliffy version: %w", err)
+	}
+	if strings.HasPrefix(version, "1.") {
+		return convertGliffyV1(input)
+	} else if strings.HasPrefix(version, "2.") {
+		return convertGliffyV2(input)
+	}
+	return Result{}, fmt.Errorf("unsupported Gliffy version: %s", version)
+}
+
+func convertGliffyV1(input []byte) (Result, error) {
+	var diagramv1 GliffyDiagramV1
+	if err := json.Unmarshal(input, &diagramv1); err != nil {
 		return Result{}, fmt.Errorf("decode Gliffy diagram: %w", err)
 	}
-	if diagram.Stage.Objects == nil {
+	if diagramv1.Stage.Objects == nil {
 		return Result{}, errors.New("decode Gliffy diagram: stage.objects is missing")
 	}
-	if diagram.Stage.Background == "" {
-		diagram.Stage.Background = "#FFFFFF"
+	if diagramv1.Stage.Background == "" {
+		diagramv1.Stage.Background = "#FFFFFF"
 	}
+	return convertDiagram(
+		diagramv1.Stage.Objects,
+		diagramv1.Stage.Layers,
+		diagramv1.Stage.Background,
+		diagramv1.Stage.GridOn,
+		diagramv1.Stage.DrawingGuidesOn,
+		diagramv1.EmbeddedResources.Resources,
+	)
+}
+
+func convertGliffyV2(input []byte) (Result, error) {
+	var diagramv2 GliffyDiagramV2
+	if err := json.Unmarshal(input, &diagramv2); err != nil {
+		return Result{}, fmt.Errorf("decode Gliffy diagram: %w", err)
+	}
+	if len(diagramv2.Pages) == 0 {
+		return Result{}, errors.New("decode Gliffy diagram: pages are missing")
+	}
+	page := &diagramv2.Pages[0]
+	for i := range diagramv2.Pages {
+		if diagramv2.Pages[i].ID == diagramv2.DefaultPage {
+			page = &diagramv2.Pages[i]
+			break
+		}
+	}
+	if page.Scene.Objects == nil {
+		return Result{}, errors.New("decode Gliffy diagram: page scene.objects is missing")
+	}
+	if page.Scene.Background == "" {
+		page.Scene.Background = "#FFFFFF"
+	}
+	return convertDiagram(
+		page.Scene.Objects,
+		page.Scene.Layers,
+		page.Scene.Background,
+		page.Scene.GridOn,
+		page.Scene.DrawingGuidesOn,
+		diagramv2.Resources,
+	)
+}
+
+func convertDiagram(objects []*Object, layers []Layer, background string, gridOn, drawingGuidesOn bool, resources []Resource) (Result, error) {
 	translations, err := cachedTranslations()
 	if err != nil {
 		return Result{}, err
 	}
 
 	converter := converter{
-		diagram:      &diagram,
+		background:   background,
+		layers:       layers,
 		translations: translations,
-		resources:    indexResources(diagram.EmbeddedResources.Resources),
+		resources:    indexResources(resources),
 		layerIDs:     make(map[string]string),
 		vertices:     make(map[string]*Object),
 	}
-	converter.prepare(diagram.Stage.Objects, nil)
+	converter.prepare(objects, nil)
 	converter.createLayers()
-	converter.collect(diagram.Stage.Objects, nil)
-	sortObjects(diagram.Stage.Objects)
-	converter.assignObjectIDs(diagram.Stage.Objects)
+	converter.collect(objects, nil)
+	sortObjects(objects)
+	converter.assignObjectIDs(objects)
 	rootParent := "2"
-	if len(diagram.Stage.Layers) == 0 {
+	if len(layers) == 0 {
 		rootParent = "1"
 	}
-	for _, obj := range diagram.Stage.Objects {
+	for _, obj := range objects {
 		converter.addObject(obj, rootParent)
 	}
 
 	model := MxGraphModel{
-		Background: diagram.Stage.Background,
-		Grid:       boolString(diagram.Stage.GridOn),
-		Guides:     boolString(diagram.Stage.DrawingGuidesOn),
+		Background: background,
+		Grid:       boolString(gridOn),
+		Guides:     boolString(drawingGuidesOn),
 		Style:      "default-style2",
 		Root:       MxRoot{Cells: converter.cells},
 	}
@@ -77,8 +133,25 @@ func Convert(input []byte) (Result, error) {
 	return Result{XML: data, Warnings: converter.warnings}, nil
 }
 
+func getGliffyVersion(jsonData []byte) (string, error) {
+	var raw map[string]any
+	if err := json.Unmarshal(jsonData, &raw); err != nil {
+		return "", err
+	}
+	version := "1.0" // default fallback
+	if md, ok := raw["metadata"].(map[string]any); ok {
+		if v, ok := md["version"].(string); ok {
+			version = v
+		}
+	} else if v, ok := raw["version"].(string); ok {
+		version = v
+	}
+	return version, nil
+}
+
 type converter struct {
-	diagram      *Diagram
+	background   string
+	layers       []Layer
 	translations map[string]string
 	resources    map[string]string
 	cells        []MxCell
@@ -176,7 +249,7 @@ func rawOrder(raw json.RawMessage) string {
 }
 
 func (c *converter) createLayers() {
-	layers := append([]Layer(nil), c.diagram.Stage.Layers...)
+	layers := append([]Layer(nil), c.layers...)
 	sort.SliceStable(layers, func(i, j int) bool { return layers[i].Order < layers[j].Order })
 	c.cells = append(c.cells, MxCell{ID: "0"})
 	if len(layers) == 0 {

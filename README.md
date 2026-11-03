@@ -125,3 +125,5 @@ zensical serve
 https://github.com/Spenhouet/confluence-markdown-exporter
 
 https://github.com/yousafgill/draw.io/
+
+https://app.diagrams.net/js/gliffy/drawio-gliffy.min.js
