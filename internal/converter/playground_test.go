@@ -1,4 +1,4 @@
-// go:build playground
+//go:build playground
 package converter
 
 import (
