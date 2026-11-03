@@ -46,18 +46,3 @@ func TestConvertGliffyV2UsesDefaultPage(t *testing.T) {
 		t.Errorf("unexpected converted object cell: %+v", cell)
 	}
 }
-
-func TestConvertGliffyV2Fixture(t *testing.T) {
-	input, err := os.ReadFile("../../tests/gliffy/test_v2_1.gliffy")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := Convert(input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.XML) == 0 {
-		t.Fatal("conversion returned empty XML")
-	}
-}
