@@ -273,6 +273,83 @@ func TestCrawlConfluencePreservesParentAndChildMarkdown(t *testing.T) {
 	}
 }
 
+func TestDownloadAttachmentsFetchesReferencedGliffyFromOtherPage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var response any
+		switch r.URL.Path {
+		case "/content/current/child/attachment":
+			response = goconfluence.Search{Results: []goconfluence.Results{{
+				Title: "local.txt",
+				Links: &goconfluence.Links{Download: "/download/local.txt"},
+			}}}
+		case "/content/remote/child/attachment":
+			response = goconfluence.Search{Results: []goconfluence.Results{
+				{Title: "diagram.gliffy", Links: &goconfluence.Links{Download: "/download/diagram.gliffy"}},
+				{Title: "unreferenced.txt", Links: &goconfluence.Links{Download: "/download/unreferenced.txt"}},
+			}}
+		case "/download/local.txt":
+			_, _ = w.Write([]byte("local attachment"))
+			return
+		case "/download/diagram.gliffy":
+			_, _ = w.Write([]byte("referenced Gliffy attachment"))
+			return
+		case "/download/unreferenced.txt":
+			t.Error("downloaded an unreferenced attachment from another page")
+			http.NotFound(w, r)
+			return
+		default:
+			t.Errorf("unexpected request: %s", r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	api, err := goconfluence.NewAPIWithClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := &config.CmdLineArgs{OutputDir: t.TempDir()}
+	page := &goconfluence.Content{
+		ID:    "current",
+		Title: "Current",
+		Body: goconfluence.Body{Storage: goconfluence.Storage{Value: `
+			<ac:structured-macro ac:name="gliffy">
+				<ac:parameter ac:name="pageid">remote</ac:parameter>
+				<ac:parameter ac:name="name">diagram.gliffy</ac:parameter>
+			</ac:structured-macro>
+			<ac:structured-macro ac:name="gliffy">
+				<ac:parameter ac:name="pageid">current</ac:parameter>
+				<ac:parameter ac:name="name">same-page.gliffy</ac:parameter>
+			</ac:structured-macro>
+			<ac:structured-macro ac:name="other">
+				<ac:parameter ac:name="pageid">ignored</ac:parameter>
+				<ac:parameter ac:name="name">ignored.gliffy</ac:parameter>
+			</ac:structured-macro>
+		`}},
+	}
+
+	if err := newCrawler(api, args, context.Background()).downloadAttachments("docs", page); err != nil {
+		t.Fatalf("downloadAttachments() error = %v", err)
+	}
+
+	for path, want := range map[string]string{
+		"docs/attachments/local.txt":      "local attachment",
+		"docs/attachments/diagram.gliffy": "referenced Gliffy attachment",
+	} {
+		got, err := os.ReadFile(filepath.Join(args.OutputDir, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatalf("read downloaded attachment %q: %v", path, err)
+		}
+		if string(got) != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+}
+
 func TestCrawlConfluenceStopsWhenContextIsCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
