@@ -66,7 +66,7 @@ func (c *Crawler) crawlConfluence(level int, outputDir string, pageID string, pa
 	if err != nil {
 		return err
 	}
-	if c.args.Debug {
+	if c.args.DebugLevel != "" {
 		jsonFile := filepath.Join(c.args.OutputDir, "json", pageID+".json")
 		if err := storage.WriteJSONFile(jsonFile, content); err != nil {
 			c.logger.Error().Err(err).Msgf("failed to write page '%s' JSON to '%s'", pageID, jsonFile)
@@ -76,7 +76,7 @@ func (c *Crawler) crawlConfluence(level int, outputDir string, pageID string, pa
 	children := content.Children.Page
 	outputDir, filename := pageOutputLocation(content, children, level, outputDir, pageName)
 	c.logger.Info().Str("page_id", content.ID).Int("depth", level).Msgf("converting page %s", content.Title)
-	if c.args.Debug {
+	if c.args.DebugLevel != "" {
 		c.logger.Debug().Msgf("source for page %s:\n%s", content.Title, content.Body.Storage.Value)
 	}
 	childMkDoc, err := c.convertAndWritePage(content, outputDir, filename, mkDoc)

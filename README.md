@@ -55,7 +55,7 @@ override environment/config values.
 | `children` | `CONF2MD_CHILDREN` | `true` |
 | `local` | `CONF2MD_LOCAL` | `false` |
 | `mkdocs` | `CONF2MD_MKDOCS` | `true` |
-| `debug` | `CONF2MD_DEBUG` | `false` |
+| `debug` | `CONF2MD_DEBUG` | disabled (`debug` or `trace`) |
 | `timeout` | `CONF2MD_TIMEOUT` | `2m` |
 
 `timeout` limits each Confluence HTTP request, including downloading the
@@ -86,8 +86,13 @@ of version control; `.env` is already ignored.
 
 ### Debug logs
 ```
- go run ./cmd/conf2md -p <pageid> -d > log.txt 2>&1     
+ go run ./cmd/conf2md -p <pageid> --debug debug > log.txt 2>&1
+ go run ./cmd/conf2md -p <pageid> --debug trace > log.txt 2>&1
  ```
+
+Pass `debug` or `trace` to `--debug` (or `-d`). Trace level includes HTTP
+request and response dumps. `CONF2MD_DEBUG` accepts `debug` or `trace`; legacy
+boolean values `true` and `false` remain supported.
 
 ### cloud id
 https://<domain>.atlassian.net/_edge/tenant_info

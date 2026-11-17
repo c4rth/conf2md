@@ -24,7 +24,7 @@ func (a *API) Request(req *http.Request) ([]byte, error) {
 		a.Auth(req)
 	}
 
-	if event := log.Debug(); event.Enabled() {
+	if event := log.Trace(); event.Enabled() {
 		dumpReq := req.Clone(req.Context())
 		dumpReq.Header.Del("Authorization")
 		dumpReq.Header.Del("Proxy-Authorization")
@@ -45,7 +45,7 @@ func (a *API) Request(req *http.Request) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	log.Debug().Msgf("====== Response Status Code: %d ======", resp.StatusCode)
+	log.Trace().Msgf("====== Response Status Code: %d ======", resp.StatusCode)
 
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
 		if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusResetContent {
@@ -56,7 +56,7 @@ func (a *API) Request(req *http.Request) ([]byte, error) {
 			return nil, fmt.Errorf("read response body: %w", err)
 		}
 
-		if event := log.Debug(); event.Enabled() {
+		if event := log.Trace(); event.Enabled() {
 			contentType := resp.Header.Get("Content-Type")
 			if contentType == "" {
 				contentType = http.DetectContentType(res)

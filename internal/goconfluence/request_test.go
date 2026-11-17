@@ -64,7 +64,7 @@ func TestJSONRequestBodies(t *testing.T) {
 	}
 }
 
-func TestRequestDebugLogging(t *testing.T) {
+func TestRequestTraceLogging(t *testing.T) {
 	tests := []struct {
 		name        string
 		level       zerolog.Level
@@ -73,10 +73,11 @@ func TestRequestDebugLogging(t *testing.T) {
 		wantDump    bool
 	}{
 		{"disabled", zerolog.InfoLevel, "application/json", `{"payload":"value"}`, false},
-		{"text", zerolog.DebugLevel, "text/plain; charset=utf-8", "text payload", true},
-		{"json", zerolog.DebugLevel, "application/problem+json", `{"payload":"value"}`, true},
-		{"binary", zerolog.DebugLevel, "application/octet-stream", "binary payload", false},
-		{"detected binary", zerolog.DebugLevel, "", "\x00binary payload", false},
+		{"debug", zerolog.DebugLevel, "text/plain; charset=utf-8", "text payload", false},
+		{"trace text", zerolog.TraceLevel, "text/plain; charset=utf-8", "text payload", true},
+		{"trace json", zerolog.TraceLevel, "application/problem+json", `{"payload":"value"}`, true},
+		{"trace binary", zerolog.TraceLevel, "application/octet-stream", "binary payload", false},
+		{"trace detected binary", zerolog.TraceLevel, "", "\x00binary payload", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

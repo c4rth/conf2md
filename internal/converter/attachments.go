@@ -53,7 +53,6 @@ func (c *Crawler) downloadAttachments(outputDir string, content *goconfluence.Co
 			if attachment.Title == reference.name || attachment.Title == reference.name+".png" {
 				c.downloadAttachment(c.ctx, outputDir, attachment, reference.pageID)
 				foundAttachment = true
-				break
 			}
 		}
 		if !foundAttachment {

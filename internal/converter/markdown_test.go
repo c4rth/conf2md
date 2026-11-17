@@ -469,7 +469,7 @@ func TestCrawlConfluenceWritesDebugPageJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := &config.CmdLineArgs{OutputDir: t.TempDir(), Debug: true}
+	args := &config.CmdLineArgs{OutputDir: t.TempDir(), DebugLevel: "debug"}
 	crawler := newCrawler(api, args, context.Background())
 	if err := crawler.crawlConfluence(0, "docs", "page-123", "", mkdocs.NewMkDocs("root", "root")); err != nil {
 		t.Fatalf("crawlConfluence() error = %v", err)

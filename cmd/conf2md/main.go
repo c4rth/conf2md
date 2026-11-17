@@ -68,7 +68,7 @@ func resolveArgs(settings *viper.Viper) config.CmdLineArgs {
 		ExportChildren: settings.GetBool("children"),
 		Local:          settings.GetBool("local"),
 		Mkdocs:         settings.GetBool("mkdocs"),
-		Debug:          settings.GetBool("debug"),
+		DebugLevel:     config.NormalizeDebugLevel(settings.GetString("debug")),
 		Timeout:        settings.GetDuration("timeout"),
 	}
 }
@@ -87,9 +87,15 @@ func newRootCommand() *cobra.Command {
 				return err
 			}
 			args = resolveArgs(settings)
-			if args.Debug {
+			if err := args.ValidateDebugLevel(); err != nil {
+				return err
+			}
+			switch args.DebugLevel {
+			case "trace":
+				log.Logger = log.Logger.Level(zerolog.TraceLevel)
+			case "debug":
 				log.Logger = log.Logger.Level(zerolog.DebugLevel)
-			} else {
+			default:
 				log.Logger = log.Logger.Level(zerolog.InfoLevel)
 			}
 			return nil
@@ -112,7 +118,7 @@ func newRootCommand() *cobra.Command {
 	command.Flags().BoolVarP(&args.ExportChildren, "children", "c", true, "export child pages (default: true, env: CONF2MD_CHILDREN)")
 	command.Flags().BoolVarP(&args.Local, "local", "l", false, "use local mode (env: CONF2MD_LOCAL)")
 	command.Flags().BoolVarP(&args.Mkdocs, "mkdocs", "m", true, "generate mkdocs.yml (default: true, env: CONF2MD_MKDOCS)")
-	command.Flags().BoolVarP(&args.Debug, "debug", "d", false, "enable debug logging (env: CONF2MD_DEBUG)")
+	command.Flags().StringVarP(&args.DebugLevel, "debug", "d", "", "set logging level to debug or trace (env: CONF2MD_DEBUG)")
 	command.Flags().DurationVar(&args.Timeout, "timeout", goconfluence.DefaultTimeout, "maximum duration of each Confluence HTTP request, 0 disables it (default: "+goconfluence.DefaultTimeout.String()+", env: CONF2MD_TIMEOUT)")
 	cobra.CheckErr(settings.BindPFlags(command.Flags()))
 	return command
