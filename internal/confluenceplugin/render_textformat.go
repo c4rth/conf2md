@@ -71,7 +71,7 @@ func (cp *confluencePlugin) renderSpan(ctx converter.Context, w converter.Writer
 	if strings.Contains(style, "background-color:") {
 		return cp.renderTextWithDelimiter(ctx, w, node, "==")
 	}
-	if strings.Contains(style, "color:") {
+	if strings.Contains(style, "color:") && !strings.Contains(style, "color:var(--ds-text, #172b4d") {
 		return cp.renderTextWithDelimiter(ctx, w, node, "==")
 	}
 
