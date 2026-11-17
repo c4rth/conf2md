@@ -50,7 +50,7 @@ func (c *Crawler) downloadAttachments(outputDir string, content *goconfluence.Co
 
 		foundAttachment := false
 		for _, attachment := range pageAttachments.Results {
-			if attachment.Title == reference.name {
+			if attachment.Title == reference.name || attachment.Title == reference.name+".png" {
 				c.downloadAttachment(c.ctx, outputDir, attachment)
 				foundAttachment = true
 				break
