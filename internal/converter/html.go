@@ -33,6 +33,7 @@ var confluenceConverter = converter.NewConverter(
 		),
 		table.NewTablePlugin(
 			table.WithNewlineBehavior(table.NewlineBehaviorPreserve),
+			table.WithCellPaddingBehavior(table.CellPaddingBehaviorMinimal),
 		),
 	),
 )

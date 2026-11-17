@@ -98,10 +98,23 @@ func (cp *confluencePlugin) renderList(ctx converter.Context, w converter.Writer
 		if renderedItems < len(items) {
 			WriteString(w, "\n")
 		}
-		
+
 	}
-	WriteString(w, endingListMarker + "\n")
+	if isWithinTable(node) {
+		WriteString(w, "\n")
+	} else {
+		WriteString(w, endingListMarker+"\n")
+	}
 	return converter.RenderSuccess
+}
+
+func isWithinTable(node *html.Node) bool {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if dom.NodeName(parent) == "table" {
+			return true
+		}
+	}
+	return false
 }
 
 func trimListNewlines(content []byte) []byte {

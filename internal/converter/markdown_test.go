@@ -142,6 +142,16 @@ func TestConvertConfluenceToMarkdownDoesNotAddNewlineAfterFollowingParagraph(t *
 	}
 }
 
+func TestConvertConfluenceToMarkdownKeepsListTableRowsOnOneLine(t *testing.T) {
+	got, err := convertConfluenceToMarkdown("<table><tr><th>Actions</th></tr><tr><td><ul><li>First</li><li>Second</li></ul></td></tr></table>")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "- First<br />- Second |") {
+		t.Errorf("list table cell was not kept on one Markdown row: %q", got)
+	}
+}
+
 func TestUniqueChildPageNames(t *testing.T) {
 	children := []goconfluence.Results{
 		{ID: "10", Title: "A Page"},
