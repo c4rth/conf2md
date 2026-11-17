@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -8,7 +10,7 @@ import (
 )
 
 var (
-	replacePattern    = regexp.MustCompile(`[^a-zA-Z0-9.]`)
+	replacePattern = regexp.MustCompile(`[^a-zA-Z0-9.]`)
 	consecutiveDashes = regexp.MustCompile(`-+`)
 )
 
@@ -28,6 +30,17 @@ func WriteFile(filePath string, data []byte) error {
 		return err
 	}
 	return os.WriteFile(filePath, data, 0644)
+}
+
+func WriteJSONFile(filePath string, value any) error {
+	var data bytes.Buffer
+	encoder := json.NewEncoder(&data)
+	encoder.SetIndent("", "  ")
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return err
+	}
+	return WriteFile(filePath, data.Bytes())
 }
 
 func ReadFile(filePath string) ([]byte, error) {

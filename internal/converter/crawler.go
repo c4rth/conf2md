@@ -2,7 +2,6 @@ package converter
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -68,14 +67,11 @@ func (c *Crawler) crawlConfluence(level int, outputDir string, pageID string, pa
 		return err
 	}
 	if c.args.Debug {
-		contentJSON, err := json.MarshalIndent(content, "", "  ")
-		if err != nil {
-			return fmt.Errorf("encoding debug JSON for page %s: %w", pageID, err)
+		jsonFile := filepath.Join(c.args.OutputDir, "json", pageID+".json")
+		if err := storage.WriteJSONFile(jsonFile, content); err != nil {
+			c.logger.Error().Err(err).Msgf("failed to write page '%s' JSON to '%s'", pageID, jsonFile)
 		}
-		jsonPath := filepath.Join(c.args.OutputDir, "json", pageID+".json")
-		if err := storage.WriteFile(jsonPath, contentJSON); err != nil {
-			return fmt.Errorf("writing debug JSON for page %s: %w", pageID, err)
-		}
+
 	}
 	children := content.Children.Page
 	outputDir, filename := pageOutputLocation(content, children, level, outputDir, pageName)
