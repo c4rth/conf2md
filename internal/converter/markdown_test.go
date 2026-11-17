@@ -206,7 +206,7 @@ func TestConvertAndWritePageKeepsNestedMkDocsPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(navigation, "Child: parent/child/index.md") {
+	if !strings.Contains(navigation, "'Child': parent/child/index.md") {
 		t.Errorf("generated MkDocs navigation lost nested path: %s", navigation)
 	}
 }

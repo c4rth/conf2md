@@ -8,15 +8,25 @@ import (
 )
 
 type mkDocsConfig struct {
-	SiteName string `yaml:"site_name"`
-	RepoURL  string `yaml:"repo_url"`
-	EditURI  string `yaml:"edit_uri"`
+	SiteName quotedString `yaml:"site_name"`
+	RepoURL  string       `yaml:"repo_url"`
+	EditURI  string       `yaml:"edit_uri"`
 	Theme    struct {
 		Name     string   `yaml:"name"`
 		Features []string `yaml:"features"`
 	} `yaml:"theme"`
 	Nav     []any `yaml:"nav"`
 	Plugins []any `yaml:"plugins"`
+}
+
+type quotedString string
+
+func (s quotedString) MarshalYAML() (any, error) {
+	return &yaml.Node{
+		Kind:  yaml.ScalarNode,
+		Value: string(s),
+		Style: yaml.SingleQuotedStyle,
+	}, nil
 }
 
 type MkDoc struct {
@@ -37,7 +47,7 @@ func (m *MkDoc) AddChild(child *MkDoc) {
 	m.Children = append(m.Children, child)
 }
 
-func navigationEntry(node *MkDoc) map[string]any {
+func navigationEntry(node *MkDoc) map[any]any {
 	var value any = node.Path
 	if len(node.Children) > 0 {
 		children := make([]any, 1, len(node.Children)+1)
@@ -47,7 +57,7 @@ func navigationEntry(node *MkDoc) map[string]any {
 		}
 		value = children
 	}
-	return map[string]any{node.Title: value}
+	return map[any]any{quotedString(node.Title): value}
 }
 
 func (m *MkDoc) GenerateMkDocs() (string, error) {
@@ -58,15 +68,15 @@ func (m *MkDoc) GenerateMkDocs() (string, error) {
 	log.Debug().Interface("root", m).Msgf("generating MkDocs navigation for root page: %s", m.Children[0].Title)
 
 	root := m.Children[0]
-	navigation := []any{map[string]any{root.Title: root.Path}}
+	navigation := []any{map[any]any{quotedString(root.Title): root.Path}}
 	for _, child := range root.Children {
 		navigation = append(navigation, navigationEntry(child))
 	}
 
 	config := mkDocsConfig{
-		SiteName: root.Title,
-		RepoURL:  "https://<REPO_URL>",
-		EditURI:  "?path=<PATH>",
+		SiteName: quotedString(root.Title),
+		RepoURL:  "https://dev.azure.com/_organization_/_project_",
+		EditURI:  "?path=/_docs_",
 		Nav:      navigation,
 		Plugins: []any{
 			"techdocs-core",

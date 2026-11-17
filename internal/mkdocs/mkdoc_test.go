@@ -2,6 +2,7 @@ package mkdocs
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
@@ -39,14 +40,14 @@ func TestMkDocToString(t *testing.T) {
 	if !reflect.DeepEqual(config.Nav, wantNavigation) {
 		t.Errorf("navigation = %#v, want %#v", config.Nav, wantNavigation)
 	}
-	if config.RepoURL != "https://<REPO_URL>" || config.EditURI != "?path=<PATH>" ||
+	if config.RepoURL != "https://dev.azure.com/_organization_/_project_" || config.EditURI != "?path=/_docs_" ||
 		config.Theme.Name != "material" || len(config.Plugins) != 2 {
 		t.Errorf("generated configuration lost static settings: %+v", config)
 	}
 }
 
 func TestGenerateMkDocsEscapesTitlesAndPaths(t *testing.T) {
-	root := NewMkDocs("Root: '# page'\nsecond line", "docs/root: # page.md")
+	root := NewMkDocs("Root: '# page' \"quoted\"\nsecond line", "docs/root: # page.md")
 	root.AddChild(NewMkDocs("Section: [details]\n# heading", "docs/section: [details]/# heading.md"))
 
 	wrapper := NewMkDocs("root", "root")
@@ -60,7 +61,7 @@ func TestGenerateMkDocsEscapesTitlesAndPaths(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(got), &config); err != nil {
 		t.Fatalf("generated invalid YAML: %v\n%s", err, got)
 	}
-	if config.SiteName != root.Title {
+	if string(config.SiteName) != root.Title {
 		t.Errorf("site_name = %q, want %q", config.SiteName, root.Title)
 	}
 	wantNavigation := []any{
@@ -69,6 +70,30 @@ func TestGenerateMkDocsEscapesTitlesAndPaths(t *testing.T) {
 	}
 	if !reflect.DeepEqual(config.Nav, wantNavigation) {
 		t.Errorf("navigation = %#v, want %#v", config.Nav, wantNavigation)
+	}
+}
+
+func TestGenerateMkDocsQuotesTitles(t *testing.T) {
+	root := NewMkDocs("Root's page", "docs/index.md")
+	root.AddChild(NewMkDocs("Plain title", "docs/plain.md"))
+	root.AddChild(NewMkDocs("Child's title", "docs/child.md"))
+
+	wrapper := NewMkDocs("root", "root")
+	wrapper.AddChild(root)
+	got, err := wrapper.GenerateMkDocs()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		`site_name: 'Root''s page'`,
+		`- 'Root''s page': index.md`,
+		`- 'Plain title': plain.md`,
+		`- 'Child''s title': child.md`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("generated MkDocs config does not contain %q:\n%s", want, got)
+		}
 	}
 }
 
