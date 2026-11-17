@@ -2,6 +2,7 @@ package table
 
 import (
 	"bytes"
+	"regexp"
 
 	"github.com/JohannesKaufmann/dom"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
@@ -10,6 +11,12 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 )
+
+var consecutiveNewlines = regexp.MustCompile(`\n+`)
+
+func replaceNewlinesWithBreaks(cell []byte) []byte {
+	return consecutiveNewlines.ReplaceAll(cell, []byte("<br />"))
+}
 
 type tableContent struct {
 	Alignments []string
@@ -110,7 +117,7 @@ func (t *tablePlugin) collectTableContent(ctx converter.Context, node *html.Node
 			if containsNewline(cell) {
 				if t.newlineBehavior == NewlineBehaviorPreserve {
 					// Replace newlines with <br /> tags
-					rows[i][j] = bytes.ReplaceAll(cell, []byte("\n"), []byte("<br />"))
+					rows[i][j] = replaceNewlinesWithBreaks(cell)
 					continue
 				}
 				// We're configured to skip tables with newlines, return nil

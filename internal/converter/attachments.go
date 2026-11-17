@@ -26,7 +26,7 @@ func (c *Crawler) downloadAttachments(outputDir string, content *goconfluence.Co
 		return fmt.Errorf("fetching attachments for page: %w", err)
 	}
 	for _, attachment := range attachments.Results {
-		c.downloadAttachment(c.ctx, outputDir, attachment)
+		c.downloadAttachment(c.ctx, outputDir, attachment, content.ID)
 		// Individual attachment failures are logged, but cancellation must stop the export.
 		if err := c.ctx.Err(); err != nil {
 			return err
@@ -51,7 +51,7 @@ func (c *Crawler) downloadAttachments(outputDir string, content *goconfluence.Co
 		foundAttachment := false
 		for _, attachment := range pageAttachments.Results {
 			if attachment.Title == reference.name || attachment.Title == reference.name+".png" {
-				c.downloadAttachment(c.ctx, outputDir, attachment)
+				c.downloadAttachment(c.ctx, outputDir, attachment, reference.pageID)
 				foundAttachment = true
 				break
 			}
@@ -102,12 +102,12 @@ func getMacroParameterText(node *html.Node, parameterName string) string {
 	return dom.CollectText(parameter)
 }
 
-func (c *Crawler) downloadAttachment(ctx context.Context, outputDir string, attachment goconfluence.Results) {
+func (c *Crawler) downloadAttachment(ctx context.Context, outputDir string, attachment goconfluence.Results, pageID string) {
 	mediaType := ""
 	if attachment.Metadata != nil {
 		mediaType = attachment.Metadata.MediaType
 	}
-	c.logger.Info().Str("attachment_id", attachment.ID).Msgf("downloading attachment: '%s' type: %s", attachment.Title, mediaType)
+	c.logger.Info().Str("attachment_id", attachment.ID).Msgf("downloading attachment: '%s' type: %s for page: %s", attachment.Title, mediaType, pageID)
 	if attachment.Links == nil || attachment.Links.Download == "" {
 		return
 	}
