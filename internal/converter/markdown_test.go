@@ -273,6 +273,69 @@ func TestCrawlConfluencePreservesParentAndChildMarkdown(t *testing.T) {
 	}
 }
 
+func TestCrawlConfluencePreservesConfluenceChildPageOrderInMkDocs(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var response any
+		switch r.URL.Path {
+		case "/content/parent":
+			// API returns children out of sidebar order (e.g. creation/ID order).
+			response = goconfluence.Content{
+				ID:    "parent",
+				Title: "Parent",
+				Body:  goconfluence.Body{Storage: goconfluence.Storage{Value: "<p>Parent</p>"}},
+				Children: &goconfluence.Children{Page: &goconfluence.Search{
+					Limit: 25,
+					Results: []goconfluence.Results{
+						{ID: "3", Title: "Third Step", Extensions: &goconfluence.Extensions{Position: json.RawMessage(`300`)}},
+						{ID: "1", Title: "First Step", Extensions: &goconfluence.Extensions{Position: json.RawMessage(`100`)}},
+						{ID: "2", Title: "Second Step", Extensions: &goconfluence.Extensions{Position: json.RawMessage(`200`)}},
+					},
+				}},
+			}
+		case "/content/1", "/content/2", "/content/3":
+			id := strings.TrimPrefix(r.URL.Path, "/content/")
+			response = goconfluence.Content{
+				ID:       id,
+				Title:    "Page " + id,
+				Body:     goconfluence.Body{Storage: goconfluence.Storage{Value: "<p>" + id + "</p>"}},
+				Children: &goconfluence.Children{Page: &goconfluence.Search{}},
+			}
+		case "/content/parent/child/attachment",
+			"/content/1/child/attachment",
+			"/content/2/child/attachment",
+			"/content/3/child/attachment":
+			response = goconfluence.Search{}
+		default:
+			t.Errorf("unexpected request: %s", r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	api, err := goconfluence.NewAPIWithClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := &config.CmdLineArgs{OutputDir: t.TempDir(), ExportChildren: true}
+	root := mkdocs.NewMkDocs("root", "root")
+	if err := newCrawler(api, args, context.Background()).crawlConfluence(0, "docs", "parent", "", root); err != nil {
+		t.Fatal(err)
+	}
+
+	got := make([]string, len(root.Children[0].Children))
+	for i, child := range root.Children[0].Children {
+		got[i] = child.Path
+	}
+	want := []string{"first-step.md", "second-step.md", "third-step.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("MkDocs child order = %v, want %v", got, want)
+	}
+}
+
 func TestDownloadAttachmentsFetchesReferencedGliffyFromOtherPage(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var response any
@@ -375,6 +438,53 @@ func TestCrawlConfluenceStopsWhenContextIsCancelled(t *testing.T) {
 	err = newCrawler(api, args, ctx).crawlConfluence(0, "docs", "parent", "", mkdocs.NewMkDocs("root", "root"))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("crawlConfluence() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestCrawlConfluenceWritesDebugPageJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var response any
+		switch r.URL.Path {
+		case "/content/page-123":
+			response = goconfluence.Content{
+				ID:       "page-123",
+				Title:    "Debug page",
+				Body:     goconfluence.Body{Storage: goconfluence.Storage{Value: "<p>Body</p>"}},
+				Children: &goconfluence.Children{Page: &goconfluence.Search{}},
+			}
+		case "/content/page-123/child/attachment":
+			response = goconfluence.Search{}
+		default:
+			t.Errorf("unexpected request: %s", r.URL)
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	api, err := goconfluence.NewAPIWithClient(server.URL, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := &config.CmdLineArgs{OutputDir: t.TempDir(), Debug: true}
+	crawler := newCrawler(api, args, context.Background())
+	if err := crawler.crawlConfluence(0, "docs", "page-123", "", mkdocs.NewMkDocs("root", "root")); err != nil {
+		t.Fatalf("crawlConfluence() error = %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(args.OutputDir, "json", "page-123.json"))
+	if err != nil {
+		t.Fatalf("read debug JSON: %v", err)
+	}
+	var got goconfluence.Content
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal debug JSON: %v", err)
+	}
+	if got.ID != "page-123" || got.Body.Storage.Value != "<p>Body</p>" {
+		t.Errorf("debug JSON content = (%q, %q), want (%q, %q)", got.ID, got.Body.Storage.Value, "page-123", "<p>Body</p>")
 	}
 }
 

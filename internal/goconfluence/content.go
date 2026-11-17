@@ -11,15 +11,21 @@ import (
 
 // Results array
 type Results struct {
-	ID       string    `json:"id,omitempty"`
-	Type     string    `json:"type,omitempty"`
-	Status   string    `json:"status,omitempty"`
-	Content  Content   `json:"content"`
-	Excerpt  string    `json:"excerpt,omitempty"`
-	Title    string    `json:"title,omitempty"`
-	URL      string    `json:"url,omitempty"`
-	Links    *Links    `json:"_links,omitempty"`
-	Metadata *Metadata `json:"metadata,omitempty"`
+	ID         string      `json:"id,omitempty"`
+	Type       string      `json:"type,omitempty"`
+	Status     string      `json:"status,omitempty"`
+	Content    Content     `json:"content"`
+	Excerpt    string      `json:"excerpt,omitempty"`
+	Title      string      `json:"title,omitempty"`
+	URL        string      `json:"url,omitempty"`
+	Links      *Links      `json:"_links,omitempty"`
+	Metadata   *Metadata   `json:"metadata,omitempty"`
+	Extensions *Extensions `json:"extensions,omitempty"`
+}
+
+// Extensions contains Confluence extension metadata such as sibling page position.
+type Extensions struct {
+	Position json.RawMessage `json:"position,omitempty"`
 }
 
 // Content specifies content properties
@@ -238,10 +244,10 @@ func (a *API) GetContent(ctx context.Context, query ContentQuery) (*ContentSearc
 
 // GetChildPages returns a content list of child page objects
 func (a *API) GetChildPages(ctx context.Context, id string) (*Search, error) {
-	return a.getChildContent(ctx, id, "page")
+	return a.getChildContent(ctx, id, "page", "extensions.position")
 }
 
-func (a *API) getChildContent(ctx context.Context, id, contentType string) (*Search, error) {
+func (a *API) getChildContent(ctx context.Context, id, contentType string, expand ...string) (*Search, error) {
 	var (
 		results      []Results
 		searchResult Search
@@ -253,8 +259,9 @@ func (a *API) getChildContent(ctx context.Context, id, contentType string) (*Sea
 	}
 
 	query := ContentQuery{
-		Start: 0,
-		Limit: 25,
+		Expand: expand,
+		Start:  0,
+		Limit:  25,
 	}
 
 	searchResult.Start = 0

@@ -2,7 +2,9 @@ package converter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -11,6 +13,7 @@ import (
 	"conf2md/internal/confluence"
 	"conf2md/internal/goconfluence"
 	"conf2md/internal/mkdocs"
+	"conf2md/internal/storage"
 )
 
 // Crawler holds the dependencies shared by a Confluence export.
@@ -60,9 +63,19 @@ func (c *Crawler) crawlConfluence(level int, outputDir string, pageID string, pa
 	if err := c.ctx.Err(); err != nil {
 		return err
 	}
-	content, err := confluence.GetConfluencePage(c.ctx, c.api, pageID)
+	content, err := confluence.GetConfluencePage(c.ctx, c.api, pageID, c.args.ExportChildren)
 	if err != nil {
 		return err
+	}
+	if c.args.Debug {
+		contentJSON, err := json.MarshalIndent(content, "", "  ")
+		if err != nil {
+			return fmt.Errorf("encoding debug JSON for page %s: %w", pageID, err)
+		}
+		jsonPath := filepath.Join(c.args.OutputDir, "json", pageID+".json")
+		if err := storage.WriteFile(jsonPath, contentJSON); err != nil {
+			return fmt.Errorf("writing debug JSON for page %s: %w", pageID, err)
+		}
 	}
 	children := content.Children.Page
 	outputDir, filename := pageOutputLocation(content, children, level, outputDir, pageName)
