@@ -25,12 +25,26 @@ var version = "dev"
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	err := newRootCommand().ExecuteContext(ctx)
+	command := newRootCommand()
+	command.SetArgs(defaultDebugLevel(os.Args[1:]))
+	err := command.ExecuteContext(ctx)
 	stop()
 	if err != nil {
 		log.Error().Err(err).Msg("conf2md encountered an error")
 		os.Exit(1)
 	}
+}
+
+func defaultDebugLevel(args []string) []string {
+	normalized := make([]string, 0, len(args)+1)
+	for i, arg := range args {
+		normalized = append(normalized, arg)
+		if (arg == "-d" || arg == "--debug") &&
+			(i+1 == len(args) || strings.HasPrefix(args[i+1], "-")) {
+			normalized = append(normalized, "debug")
+		}
+	}
+	return normalized
 }
 
 func initConfig(settings *viper.Viper) error {
@@ -118,7 +132,7 @@ func newRootCommand() *cobra.Command {
 	command.Flags().BoolVarP(&args.ExportChildren, "children", "c", true, "export child pages (default: true, env: CONF2MD_CHILDREN)")
 	command.Flags().BoolVarP(&args.Local, "local", "l", false, "use local mode (env: CONF2MD_LOCAL)")
 	command.Flags().BoolVarP(&args.Mkdocs, "mkdocs", "m", true, "generate mkdocs.yml (default: true, env: CONF2MD_MKDOCS)")
-	command.Flags().StringVarP(&args.DebugLevel, "debug", "d", "", "set logging level to debug or trace (env: CONF2MD_DEBUG)")
+	command.Flags().StringVarP(&args.DebugLevel, "debug", "d", "", "set logging level to debug (default) or trace (env: CONF2MD_DEBUG)")
 	command.Flags().DurationVar(&args.Timeout, "timeout", goconfluence.DefaultTimeout, "maximum duration of each Confluence HTTP request, 0 disables it (default: "+goconfluence.DefaultTimeout.String()+", env: CONF2MD_TIMEOUT)")
 	cobra.CheckErr(settings.BindPFlags(command.Flags()))
 	return command

@@ -87,12 +87,14 @@ of version control; `.env` is already ignored.
 ### Debug logs
 ```
  go run ./cmd/conf2md -p <pageid> --debug debug > log.txt 2>&1
+ go run ./cmd/conf2md -p <pageid> -d > log.txt 2>&1
  go run ./cmd/conf2md -p <pageid> --debug trace > log.txt 2>&1
  ```
 
-Pass `debug` or `trace` to `--debug` (or `-d`). Trace level includes HTTP
-request and response dumps. `CONF2MD_DEBUG` accepts `debug` or `trace`; legacy
-boolean values `true` and `false` remain supported.
+Pass `debug` or `trace` to `--debug` (or `-d`); omitting the level defaults to
+`debug`. Trace level includes HTTP request and response dumps. `CONF2MD_DEBUG`
+accepts `debug` or `trace`; legacy boolean values `true` and `false` remain
+supported.
 
 ### cloud id
 https://<domain>.atlassian.net/_edge/tenant_info
