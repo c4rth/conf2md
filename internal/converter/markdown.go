@@ -17,6 +17,7 @@ func ConvertConfluenceToMarkdown(ctx context.Context, args *config.CmdLineArgs) 
 	start := time.Now()
 	mkDoc := mkdocs.NewMkDocs("root", "root")
 	err := error(nil)
+	storage.RemoveDir(args.OutputDir, "docs") // ignore error for now
 	if args.Local {
 		log.Info().Msgf("converting local file: %s", args.Page)
 		err = convertLocal(args, mkDoc)

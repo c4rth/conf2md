@@ -46,3 +46,8 @@ func WriteJSONFile(filePath string, value any) error {
 func ReadFile(filePath string) ([]byte, error) {
 	return os.ReadFile(filePath)
 }
+
+func RemoveDir(basePath string, dirName string) error {
+	dirPath := filepath.Join(basePath, dirName)
+	return os.RemoveAll(dirPath)
+}
