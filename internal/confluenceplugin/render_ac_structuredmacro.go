@@ -8,6 +8,7 @@ import (
 
 	"github.com/JohannesKaufmann/dom"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
+	"github.com/JohannesKaufmann/html-to-markdown/v2/marker"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html"
 
@@ -47,6 +48,8 @@ func (cp *confluencePlugin) renderAcStructuredMacro(ctx converter.Context, w con
 			return renderMacroTabNav(ctx, w, node)
 		case "panel":
 			return renderMacroPanel(ctx, w, node)
+		case "section":
+			return renderMacroSection(ctx, w, node)
 		default:
 			if strings.Contains(acName, "nav-grou") {
 				return renderMacroTabsGroup(acName)
@@ -307,6 +310,78 @@ func renderMacroPanel(ctx converter.Context, w converter.Writer, node *html.Node
 		writeAdmonition(ctx, w, "quote", " ", false, richTextNode)
 	}
 	return converter.RenderSuccess
+}
+
+func renderMacroSection(ctx converter.Context, w converter.Writer, node *html.Node) converter.RenderStatus {
+	richTextNode := dom.FindFirstNode(node, func(n *html.Node) bool {
+		return dom.NodeName(n) == "ac:rich-text-body"
+	})
+	if richTextNode != nil {
+		columns := findSectionColumns(richTextNode)
+		if len(columns) > 0 {
+			renderSectionColumns(ctx, w, columns)
+			return converter.RenderSuccess
+		}
+		return converter.RenderTryNext
+	}
+	return converter.RenderSuccess
+}
+
+func findSectionColumns(node *html.Node) []*html.Node {
+	var columns []*html.Node
+	var visit func(*html.Node)
+	visit = func(n *html.Node) {
+		if dom.NodeName(n) == "ac:structured-macro" {
+			if dom.GetAttributeOr(n, "ac:name", "") == "column" {
+				columns = append(columns, n)
+			}
+			return
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			visit(child)
+		}
+	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		visit(child)
+	}
+	return columns
+}
+
+func renderSectionColumns(ctx converter.Context, w converter.Writer, columns []*html.Node) {
+	renderRow := func(cells []string) {
+		WriteString(w, "|")
+		for _, cell := range cells {
+			WriteString(w, " "+cell+" |")
+		}
+		WriteString(w, "\n")
+	}
+
+	WriteString(w, "\n\n")
+	renderRow(make([]string, len(columns)))
+	separators := make([]string, len(columns))
+	for i := range separators {
+		separators[i] = "---"
+	}
+	renderRow(separators)
+
+	cells := make([]string, len(columns))
+	for i, column := range columns {
+		body := dom.FindFirstNode(column, func(n *html.Node) bool {
+			return dom.NodeName(n) == "ac:rich-text-body"
+		})
+		if body == nil {
+			continue
+		}
+		var content bytes.Buffer
+		ctx.RenderNodes(ctx, &content, body)
+		rendered := bytes.Replace(content.Bytes(), []byte{byte(marker.MarkerEscaping), '|'}, []byte(`\|`), -1)
+		rendered = ctx.UnEscapeContent(rendered)
+		cell := strings.TrimSpace(string(rendered))
+		cell = strings.ReplaceAll(cell, "\n", "<br />")
+		cells[i] = cell
+	}
+	renderRow(cells)
+	WriteString(w, "\n")
 }
 
 //

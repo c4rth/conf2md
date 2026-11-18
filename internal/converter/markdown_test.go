@@ -30,6 +30,31 @@ func TestConvertConfluenceToMarkdownBytes(t *testing.T) {
 	}
 }
 
+func TestConvertConfluenceSectionColumnsToMarkdownTable(t *testing.T) {
+	input := `<ac:structured-macro ac:name="section"><ac:rich-text-body>
+		<ac:structured-macro ac:name="column"><ac:rich-text-body><p>First | column</p></ac:rich-text-body></ac:structured-macro>
+		<ac:structured-macro ac:name="column"><ac:rich-text-body><p>Second</p></ac:rich-text-body></ac:structured-macro>
+	</ac:rich-text-body></ac:structured-macro>`
+
+	got, err := convertConfluenceToMarkdown(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "|  |  |\n| --- | --- |\n| First \\| column | Second |"; string(got) != want {
+		t.Errorf("Markdown = %q, want %q", got, want)
+	}
+}
+
+func TestConvertConfluenceSectionWithoutColumns(t *testing.T) {
+	got, err := convertConfluenceToMarkdown(`<ac:structured-macro ac:name="section"><ac:rich-text-body><p>Content</p></ac:rich-text-body></ac:structured-macro>`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "Content"; string(got) != want {
+		t.Errorf("Markdown = %q, want %q", got, want)
+	}
+}
+
 func TestConvertConfluenceToMarkdownEscapesLeadingHash(t *testing.T) {
 	tests := []struct {
 		name string
